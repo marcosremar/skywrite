@@ -1,0 +1,136 @@
+# Skywrite - Alpine Linux with SSH for Windsurf
+# Optimized for remote development
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install system dependencies including OpenSSH
+RUN apk add --no-cache \
+    openssl \
+    openssh \
+    openssh-server \
+    chromium \
+    ca-certificates \
+    postgresql \
+    postgresql-contrib \
+    redis \
+    postgresql-client \
+    curl \
+    bash \
+    sudo
+
+# Configure SSH for Windsurf compatibility
+RUN mkdir -p /var/run/sshd /root/.ssh && \
+    chmod 700 /root/.ssh && \
+    ssh-keygen -A && \
+    sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config && \
+    sed -i 's/#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#AuthorizedKeysFile.*/AuthorizedKeysFile .ssh\/authorized_keys/' /etc/ssh/sshd_config && \
+    sed -i 's/#Port 22/Port 22/' /etc/ssh/sshd_config && \
+    sed -i 's/#ListenAddress 0.0.0.0/ListenAddress 0.0.0.0/' /etc/ssh/sshd_config && \
+    sed -i 's/#PermitEmptyPasswords.*/PermitEmptyPasswords no/' /etc/ssh/sshd_config && \
+    sed -i 's/UsePAM yes/UsePAM no/' /etc/ssh/sshd_config && \
+    echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config && \
+    echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config && \
+    echo "TCPKeepAlive yes" >> /etc/ssh/sshd_config
+
+# Set Puppeteer to use system Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Copy package files
+COPY package.json package-lock.json* ./
+
+# Install Node.js dependencies
+RUN npm ci --only=production=false
+
+# Copy prisma schema
+COPY prisma ./prisma/
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy application code
+COPY . .
+
+# Create startup script with proper SSH initialization
+RUN cat > /start.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "🚀 Starting Skywrite container..."
+
+# Ensure SSH directory exists with correct permissions
+mkdir -p /root/.ssh
+chmod 700 /root/.ssh
+touch /root/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys
+
+# Start SSH daemon
+echo "🔐 Starting SSH daemon..."
+/usr/sbin/sshd -D &
+SSHD_PID=$!
+sleep 2
+
+# Check if SSH is running
+if ps -p $SSHD_PID > /dev/null; then
+    echo "✅ SSH daemon started successfully (PID: $SSHD_PID)"
+else
+    echo "❌ SSH daemon failed to start"
+fi
+
+# Initialize PostgreSQL
+echo "🗄️ Initializing PostgreSQL..."
+mkdir -p /tmp/postgres
+chown -R postgres:postgres /tmp/postgres 2>/dev/null || true
+su - postgres -c 'initdb -D /tmp/postgres' 2>/dev/null || echo "PostgreSQL already initialized"
+
+# Start PostgreSQL
+echo "🗄️ Starting PostgreSQL..."
+mkdir -p /run/postgresql
+chown postgres:postgres /run/postgresql
+su - postgres -c 'pg_ctl -D /tmp/postgres -l /tmp/postgres.log start' || echo "PostgreSQL start attempted"
+sleep 3
+
+# Create database
+su - postgres -c 'createdb skywrite' 2>/dev/null || echo "Database already exists"
+su - postgres -c 'createuser skywrite' 2>/dev/null || echo "User already exists"
+
+# Start Redis
+echo "📦 Starting Redis..."
+redis-server --daemonize yes
+
+# Set environment variables
+export DATABASE_URL="postgresql://postgres@localhost:5432/skywrite"
+export NODE_ENV=development
+export NEXTAUTH_SECRET=dev-secret-key-change-in-production
+export NEXTAUTH_URL=http://skywrite.orb.local:3002
+export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Run migrations
+echo "🔄 Running database migrations..."
+su - postgres -c "cd /app && DATABASE_URL='postgresql://postgres@localhost:5432/skywrite' npx prisma migrate dev --name init" 2>/dev/null || echo "Migrations already applied"
+
+# Seed database
+echo "🌱 Seeding database..."
+su - postgres -c "cd /app && DATABASE_URL='postgresql://postgres@localhost:5432/skywrite' npm run db:seed" 2>/dev/null || echo "Database already seeded"
+
+# Start Next.js application
+echo "🚀 Starting Next.js application..."
+exec npm run dev
+EOF
+
+RUN chmod +x /start.sh
+
+# Expose ports
+EXPOSE 22 3002
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:3002 || exit 1
+
+# Start script
+CMD ["/start.sh"]

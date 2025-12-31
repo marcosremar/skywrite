@@ -1,0 +1,83 @@
+% Table of Contents Configuration
+% ===========================
+
+% Ensure we have dots in the TOC
+\usepackage{tocloft}
+% For better uppercase handling with accented characters
+\usepackage{textcase}
+
+% Add dots to all levels (chapter, section, subsection)
+\renewcommand{\cftdot}{.}
+\renewcommand{\cftdotsep}{1}
+
+% Make chapter dots visible
+\renewcommand{\cftchapdotsep}{\cftdotsep}
+
+% Adjust width of number columns to improve spacing
+\setlength{\cftchapnumwidth}{1.8em}
+\setlength{\cftsecnumwidth}{2.5em}
+\setlength{\cftsubsecnumwidth}{3.8em}
+\setlength{\cftsubsubsecnumwidth}{5.0em}
+
+% Use internal LaTeX TOC parameters to move page numbers right
+\makeatletter
+\renewcommand{\@pnumwidth}{1.55em}
+\makeatother
+
+% Add more space between title and page number with indentation
+\setlength{\cftchapindent}{0em}
+\setlength{\cftsecindent}{1.5em}
+\setlength{\cftsubsecindent}{3.8em}
+\setlength{\cftsubsubsecindent}{7.0em}
+
+% Control spacing between entries - adjusted for better readability
+\setlength{\cftbeforechapskip}{0.5em}
+\setlength{\cftbeforesecskip}{0.2em}
+\setlength{\cftbeforesubsecskip}{0.1em}
+
+% Reduce spacing after page numbers
+\renewcommand{\cftchapafterpnum}{\hspace{0pt}}
+\renewcommand{\cftsecafterpnum}{\hspace{0pt}}
+\renewcommand{\cftsubsecafterpnum}{\hspace{0pt}}
+
+% Format chapter entries: UPPERCASE and BOLD (e.g., "METODOLOGIA", "REVISÃO DE LITERATURA")
+\renewcommand{\cftchapfont}{\bfseries\MakeTextUppercase}
+\renewcommand{\cftchappagefont}{\normalfont}
+
+% Format section entries: Normal case (first letter uppercase, rest lowercase)
+\renewcommand{\cftsecfont}{\normalfont}
+\renewcommand{\cftsecpagefont}{\normalfont}
+
+% Format subsection entries: Normal case (first letter uppercase, rest lowercase)
+\renewcommand{\cftsubsecfont}{\normalfont}
+\renewcommand{\cftsubsecpagefont}{\normalfont}
+
+% Makes chapter entries formatting more consistent
+\renewcommand{\cftchapaftersnumb}{\hspace{0.8em}}
+
+% Extend leader dots all the way to the page numbers
+\renewcommand{\cftchapleader}{\cftdotfill{\cftchapdotsep}}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftsecdotsep}}
+\renewcommand{\cftsubsecleader}{\cftdotfill{\cftsubsecdotsep}}
+
+% Page numbers are already configured above with reduced spacing
+
+% Disable automatic TOC heading since we create our own
+% This must be called AFTER classicthesis is loaded
+\deftocheading{toc}{}
+% Also override classicthesis toc@heading if it exists (but don't break tocbasic)
+\makeatletter
+\@ifundefined{toc@heading}{}{%
+  \renewcommand{\toc@heading}{}%
+}
+\makeatother
+
+% Format List of Figures title: UPPERCASE and BOLD
+% Redefine the command that generates the title
+\makeatletter
+\renewcommand*{\listoffigures}{%
+  \chapter*{\bfseries\MakeTextUppercase{\listfigurename}}%
+  \@mkboth{\MakeTextUppercase{\listfigurename}}{\MakeTextUppercase{\listfigurename}}%
+  \@starttoc{lof}%
+}
+\makeatother 

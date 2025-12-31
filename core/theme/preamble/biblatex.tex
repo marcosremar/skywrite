@@ -1,0 +1,117 @@
+% Load xcolor package if not already loaded
+\usepackage[dvipsnames]{xcolor}
+
+\usepackage[
+  style=apa,
+  natbib=true,
+  clearlang=true,
+  backend=biber
+]{biblatex}
+
+% Define citation colors
+\definecolor{citeblue}{rgb}{0,0,1}
+
+% Configure hyperref for citations
+\AtBeginDocument{
+  \hypersetup{
+    citecolor=citeblue,
+    linkcolor=blue,
+    urlcolor=blue
+  }
+}
+
+% Make standard \cite command use \parencite for APA parentheses
+\let\oldcite\cite
+\renewcommand{\cite}[2][]{\textcolor{citeblue}{\parencite[#1]{#2}}}
+
+% Define textcite command for use in running text
+\let\oldtextcite\textcite
+\renewcommand{\textcite}[2][]{\textcolor{citeblue}{\oldtextcite[#1]{#2}}}
+
+% Make autocite command blue as well
+\let\oldautocite\autocite
+\renewcommand{\autocite}[2][]{\textcolor{citeblue}{\oldautocite[#1]{#2}}}
+
+% Ensure natbib commands work with biblatex (already enabled with natbib=true)
+% \citep and \citet are automatically available when natbib=true
+
+\ExecuteBibliographyOptions{%
+  %--- Backend --- --- ---
+  bibwarn=true, %
+  bibencoding=auto, % (ascii, inputenc, <encoding>)
+  %--- Sorting --- --- ---
+  sorting=nty, % Sort by name, title, year.
+  % other options: 
+  % nty        Sort by name, title, year.
+  % nyt        Sort by name, year, title.
+  % nyvt       Sort by name, year, volume, title.
+  % anyt       Sort by alphabetic label, name, year, title.
+  % anyvt      Sort by alphabetic label, name, year, volume, title.
+  % ynt        Sort by year, name, title.
+  % ydnt       Sort by year (descending), name, title.
+  % none       Do not sort at all. All entries are processed in citation order.
+  % debug      Sort by entry key. This is intended for debugging only.
+  %
+  sortcase=true,
+  %sortlos=los, % DEPRECATED - no longer needed
+  sortcites=true, % do/do not sort citations according to bib	
+  %--- Dates --- --- ---
+  date=comp,  % (short, long, terse, comp, iso8601)
+  %	origdate=
+  %	eventdate=
+  %	urldate=
+  %	alldates=
+  datezeros=true, %
+  dateabbrev=true, %
+  %--- General Options --- --- ---
+  maxnames=2,
+  minnames=1,
+  maxbibnames=100, % do not abbreviate names in bibliography
+  %	autocite= % (plain, inline, footnote, superscript) 
+  autopunct=true,
+  language=auto,
+  autolang=hyphen, % (none, hyphen, other, other*) - replaces deprecated 'babel' option
+  block=none, % (none, space, par, nbpar, ragged)
+  notetype=foot+end, % (foot+end, footonly, endonly)
+  hyperref=true, % (true, false, auto)
+  backref=false,
+  backrefstyle=three, % (none, three, two, two+, three+, all+)
+  backrefsetstyle=setonly, %
+  indexing=false, % 
+  % options:
+  % true       Enable indexing globally.
+  % false      Disable indexing globally.
+  % cite       Enable indexing in citations only.
+  % bib        Enable indexing in the bibliography only.
+  refsection=none, % (part, chapter, section, subsection)
+  refsegment=none, % (none, part, chapter, section, subsection)
+  abbreviate=true, % (true, false)
+  defernumbers=false, % 
+  punctfont=false, % 
+  arxiv=abs, % (ps, pdf, format)	
+  %--- Style Options --- --- ---	
+  % The following options are provided by the standard styles
+  isbn=true,%
+  url=true,%
+  doi=true,%
+  eprint=true,%
+}%	
+
+% Suppress all date fields except the year
+\AtEveryBibitem{%
+  \clearfield{day}%
+  \clearfield{month}%
+  \clearfield{endday}%
+  \clearfield{endmonth}%
+}
+
+\DeclareRedundantLanguages{en,EN,English}{english}
+
+% Use only the first page number in a given range
+\DeclareFieldFormat{pages}{\mkfirstpage{#1}}
+
+% Make titles bold in bibliography (Brazilian and French standard)
+\DeclareFieldFormat[article,inbook,incollection,inproceedings,patent,thesis,unpublished]{title}{\textbf{#1}}
+\DeclareFieldFormat[book]{title}{\textbf{\textit{#1}}}
+\DeclareFieldFormat{journaltitle}{\textit{#1}}
+\DeclareFieldFormat{booktitle}{\textit{#1}}

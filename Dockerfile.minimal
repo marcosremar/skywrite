@@ -1,0 +1,92 @@
+# Skywrite All-in-One - Alpine Linux Container (Minimal)
+# Includes PostgreSQL, Redis, and Next.js Application
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    openssl \
+    chromium \
+    ca-certificates \
+    postgresql \
+    postgresql-contrib \
+    redis \
+    postgresql-client \
+    curl \
+    bash
+
+# Set Puppeteer to use system Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Copy package files first for better caching
+COPY package.json package-lock.json* ./
+
+# Install Node.js dependencies
+RUN npm ci --only=production=false
+
+# Copy prisma schema for generation
+COPY prisma ./prisma/
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy the rest of the application
+COPY . .
+
+# Create startup script
+RUN cat > /start.sh << 'EOF'
+#!/bin/bash
+
+# Initialize PostgreSQL data directory
+mkdir -p /tmp/postgres
+initdb -D /tmp/postgres
+
+# Start PostgreSQL in background
+pg_ctl -D /tmp/postgres -l /tmp/postgres.log start
+
+# Start Redis in background
+redis-server --daemonize yes
+
+# Wait for PostgreSQL to be ready
+echo "Waiting for PostgreSQL to start..."
+sleep 5
+
+# Create database and user
+createdb skywrite || echo "Database already exists"
+
+# Set environment variables
+export DATABASE_URL="postgresql://postgres@localhost:5432/skywrite"
+export NODE_ENV=development
+export NEXTAUTH_SECRET=dev-secret-key-change-in-production
+export NEXTAUTH_URL=http://skywrite.orb.local:3002
+export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+export WATCHPACK_POLLING=true
+export CHOKIDAR_USEPOLLING=true
+
+# Run migrations
+echo "Running database migrations..."
+npx prisma migrate dev --name init || echo "Migrations may have already run"
+
+# Seed database
+echo "Seeding database..."
+npm run db:seed || echo "Database may already be seeded"
+
+# Start the application
+echo "Starting Skywrite application..."
+exec npm run dev
+EOF
+
+RUN chmod +x /start.sh
+
+EXPOSE 3002
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:3002 || exit 1
+
+# Start script
+CMD ["/start.sh"]

@@ -1,0 +1,13 @@
+$latex = 'pdflatex -synctex=1 --shell-escape';
+$pdflatex = 'pdflatex -synctex=1 --shell-escape';
+$lualatex = 'lualatex -synctex=1 --shell-escape';
+$max_repeat = 20;
+$bibtex_use = 2;
+$pdf_mode = 1;
+
+# Ensure all auxiliary files go to output directory
+$aux_dir = 'build';
+$out_dir = 'build';
+
+# Cleanup rules
+$clean_ext = 'aux bbl bcf blg brf fdb_latexmk fls log lof lot run.xml toc synctex.gz';

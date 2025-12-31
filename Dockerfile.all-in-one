@@ -1,0 +1,135 @@
+# Skywrite All-in-One - Alpine Linux Container
+# Includes PostgreSQL, Redis, and Next.js Application
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    openssl \
+    chromium \
+    ca-certificates \
+    postgresql \
+    postgresql-contrib \
+    redis \
+    postgresql-client \
+    curl \
+    bash \
+    supervisor
+
+# Set Puppeteer to use system Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Copy package files first for better caching
+COPY package.json package-lock.json* ./
+
+# Install Node.js dependencies
+RUN npm ci --only=production=false
+
+# Copy prisma schema for generation
+COPY prisma ./prisma/
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy the rest of the application
+COPY . .
+
+# Create supervisor configuration
+RUN mkdir -p /var/log/supervisor /etc/supervisor/conf.d
+
+# Supervisor configuration for PostgreSQL, Redis, and Next.js
+RUN cat > /etc/supervisor/conf.d/skywrite.conf << 'EOF'
+[unix_http_server]
+file=/var/run/supervisor.sock
+
+[supervisord]
+nodaemon=true
+logfile=/var/log/supervisor/supervisord.log
+pidfile=/var/run/supervisord.pid
+
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+[supervisorctl]
+serverurl=unix:///var/run/supervisor.sock
+
+[program:postgresql]
+command=/bin/bash -c "exec /etc/init.d/postgresql start && tail -f /dev/null"
+autostart=true
+autorestart=false
+priority=100
+stdout_logfile=/var/log/supervisor/postgresql.log
+stderr_logfile=/var/log/supervisor/postgresql.log
+
+[program:redis]
+command=/usr/bin/redis-server
+autostart=true
+autorestart=true
+priority=200
+stdout_logfile=/var/log/supervisor/redis.log
+stderr_logfile=/var/log/supervisor/redis.log
+
+[program:init-db]
+command=/bin/bash -c "sleep 5 && sudo -u postgres createuser -s skywrite && sudo -u postgres createdb -O skywrite skywrite && npx prisma migrate dev --name init && npm run db:seed"
+autostart=true
+autorestart=false
+priority=300
+stdout_logfile=/var/log/supervisor/init-db.log
+stderr_logfile=/var/log/supervisor/init-db.log
+
+[program:skywrite]
+command=npm run dev
+directory=/app
+autostart=true
+autorestart=true
+priority=400
+stdout_logfile=/var/log/supervisor/skywrite.log
+stderr_logfile=/var/log/supervisor/skywrite.log
+environment=NODE_ENV=development,DATABASE_URL=postgresql://skywrite:skywrite@localhost:5432/skywrite,NEXTAUTH_SECRET=dev-secret-key-change-in-production,NEXTAUTH_URL=http://skywrite.orb.local:3002,PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true,PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium,WATCHPACK_POLLING=true,CHOKIDAR_USEPOLLING=true
+EOF
+
+# Create startup script
+RUN cat > /start.sh << 'EOF'
+#!/bin/bash
+
+# Initialize PostgreSQL data directory
+if [ ! -d "/var/lib/postgresql/data" ]; then
+    mkdir -p /var/lib/postgresql/data
+    chown -R postgres:postgres /var/lib/postgresql
+    sudo -u postgres initdb -D /var/lib/postgresql/data
+fi
+
+# Start PostgreSQL
+sudo -u postgres pg_ctl -D /var/lib/postgresql/data -l /var/log/postgresql.log start
+
+# Start Redis
+redis-server --daemonize yes
+
+# Wait for PostgreSQL to be ready
+sleep 5
+
+# Create database and user
+sudo -u postgres createuser -s skywrite || true
+sudo -u postgres createdb -O skywrite skywrite || true
+
+# Run migrations and seed
+npx prisma migrate dev --name init || true
+npm run db:seed || true
+
+# Start all services with supervisor
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/skywrite.conf
+EOF
+
+RUN chmod +x /start.sh
+
+EXPOSE 3002
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:3002 || exit 1
+
+# Start script
+CMD ["/start.sh"]

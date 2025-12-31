@@ -1,0 +1,72 @@
+# Pandoc Configuration for Thesis
+# Converts Markdown to LaTeX
+
+# Input/Output
+from: markdown+citations+footnotes+smart+tex_math_dollars
+to: latex
+
+# Extensions
+extensions:
+  - citations
+  - footnotes
+  - smart
+  - tex_math_dollars
+  - fenced_code_blocks
+  - fenced_code_attributes
+  - backtick_code_blocks
+  - inline_code_attributes
+  - raw_attribute
+  - implicit_figures
+
+# Citation style
+citeproc: true
+cite-method: biblatex
+
+# LaTeX specific
+pdf-engine: pdflatex
+top-level-division: chapter
+
+# Filters
+filters: []
+
+# Variables
+variables:
+  documentclass: scrreprt
+  classoption:
+    - twoside
+    - openright
+    - titlepage
+    - numbers=noenddot
+  fontsize: 10pt
+  geometry:
+    - a5paper
+    - bindingoffset=5.5mm
+  lang: en-US
+
+# Table of contents
+toc: false
+toc-depth: 3
+
+# Numbering
+number-sections: true
+number-offset: 0
+
+# Cross-references
+link-citations: true
+linkReferences: true
+
+# Code blocks
+listings: false
+highlight-style: tango
+
+# Images
+graphics: true
+
+# Markdown extensions
+markdown-extensions:
+  - tables
+  - fenced_code_blocks
+  - definition_lists
+  - strikeout
+  - superscript
+  - subscript

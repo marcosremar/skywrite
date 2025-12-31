@@ -1,0 +1,44 @@
+# Skywrite - Alpine Linux Docker Image
+# Optimized for Orbit Stack
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install system dependencies for Prisma and Puppeteer
+RUN apk add --no-cache \
+    openssl \
+    chromium \
+    ca-certificates \
+    postgresql-client
+
+# Set Puppeteer to use system Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Copy package files first for better caching
+COPY package.json package-lock.json* ./
+
+# Install all dependencies
+RUN npm ci --only=production=false
+
+# Copy prisma schema for generation
+COPY prisma ./prisma/
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy the rest of the application
+COPY . .
+
+# Skip build for development mode
+# RUN npm run build
+
+EXPOSE 3002
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3002/api/health || exit 1
+
+# Default command
+CMD ["npm", "run", "dev"]

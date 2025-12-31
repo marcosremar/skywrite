@@ -1,0 +1,27 @@
+{
+  "name": "Skywrite - OrbStack",
+  "host": "skywrite.orb.local",
+  "port": 22,
+  "user": "root",
+  "privateKeyPath": "~/.ssh/id_rsa",
+  "remotePath": "/app",
+  "localPath": "/Users/marcos/Documents/projects/microsass/dumont-writer/thesis-writer",
+  "sync": {
+    "uploadOnSave": true,
+    "downloadOnOpen": true,
+    "ignore": [
+      "node_modules",
+      ".next",
+      ".git",
+      "dist",
+      "build"
+    ]
+  },
+  "terminal": {
+    "shell": "/bin/bash",
+    "keepAlive": true
+  },
+  "forwardPorts": [
+    3002
+  ]
+}

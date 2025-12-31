@@ -1,0 +1,43 @@
+services:
+  # Skywrite All-in-One Container (Alpine based)
+  skywrite:
+    build:
+      context: .
+      dockerfile: Dockerfile.windsurf
+    container_name: skywrite
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+      - "22:22"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://skywrite:skywrite@localhost:5432/skywrite
+      - NEXTAUTH_SECRET=dev-secret-key-change-in-production
+      - NEXTAUTH_URL=http://skywrite.orb.local:3002
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./core:/app/core
+      - ./prisma:/app/prisma
+      - ./next.config.ts:/app/next.config.ts
+      - ./tailwind.config.ts:/app/tailwind.config.ts
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./postcss.config.mjs:/app/postcss.config.mjs
+      - ./.env:/app/.env
+      - node_modules:/app/node_modules
+      - next_cache:/app/.next
+      - postgres_data:/var/lib/postgresql/data
+      - redis_data:/data
+    stdin_open: true
+    tty: true
+    privileged: true  # Needed to run PostgreSQL and Redis in same container
+
+volumes:
+  postgres_data:
+  redis_data:
+  node_modules:
+  next_cache:

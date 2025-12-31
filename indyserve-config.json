@@ -1,0 +1,39 @@
+{
+  "name": "Skywrite - IndyServe Configuration",
+  "ssh": {
+    "host": "skywrite.orb.local",
+    "port": 22,
+    "user": "root",
+    "privateKey": "~/.ssh/id_rsa",
+    "timeout": 10000,
+    "strictHostKeyChecking": false,
+    "userKnownHostsFile": "/dev/null",
+    "logLevel": "ERROR",
+    "keepAlive": {
+      "enabled": true,
+      "interval": 30,
+      "countMax": 3
+    },
+    "tcpKeepAlive": true,
+    "compression": false,
+    "authMethods": ["publickey"],
+    "keyTypes": ["ssh-rsa", "ssh-ed25519"]
+  },
+  "connection": {
+    "maxRetries": 3,
+    "retryDelay": 2000,
+    "connectTimeout": 10000
+  },
+  "remote": {
+    "path": "/app",
+    "shell": "/bin/bash",
+    "env": {
+      "TERM": "xterm-256color",
+      "LANG": "en_US.UTF-8"
+    }
+  },
+  "ports": {
+    "forward": [3002],
+    "local": ["3002:3002"]
+  }
+}

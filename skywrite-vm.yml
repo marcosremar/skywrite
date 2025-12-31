@@ -1,0 +1,52 @@
+# Alpine Linux VM for Skywrite Project
+# Orbit Stack Configuration
+
+# Base Alpine Linux image
+image: alpine:latest
+
+# VM configuration
+memory: 2048
+cpu: 2
+disk: 20
+
+# Network configuration
+network:
+  type: bridge
+  ports:
+    - "3002:3002"  # Next.js app
+    - "5434:5432"  # PostgreSQL
+    - "6379:6379"  # Redis
+
+# Packages to install
+packages:
+  - nodejs
+  - npm
+  - postgresql
+  - postgresql-contrib
+  - redis
+  - chromium
+  - git
+  - curl
+  - wget
+  - bash
+  - shadow
+
+# Services to enable
+services:
+  - postgresql
+  - redis
+
+# User configuration
+user:
+  name: skywrite
+  password: skywrite
+  shell: /bin/bash
+
+# Environment variables
+environment:
+  - NODE_ENV=development
+  - DATABASE_URL=postgresql://skywrite:skywrite@localhost:5432/skywrite
+  - NEXTAUTH_SECRET=dev-secret-key-change-in-production
+  - NEXTAUTH_URL=http://localhost:3002
+  - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+  - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
