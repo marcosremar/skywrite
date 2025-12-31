@@ -26,7 +26,7 @@ interface EditorPreferences {
 
 const defaultPreferences: EditorPreferences = {
   showPdfPanel: true,
-  panelSizes: [15, 85], // sidebar: 15%, main: 85%
+  panelSizes: [15, 85],
 };
 
 function useEditorPreferences() {
@@ -39,7 +39,15 @@ function useEditorPreferences() {
       const stored = localStorage.getItem(EDITOR_PREFS_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Partial<EditorPreferences>;
-        setPreferences({ ...defaultPreferences, ...parsed });
+        // Migrate old object format to array format
+        if (parsed.panelSizes && !Array.isArray(parsed.panelSizes)) {
+          const obj = parsed.panelSizes as Record<string, number>;
+          parsed.panelSizes = [obj.sidebar ?? 15, obj.main ?? 85];
+        }
+        // Validate panelSizes is an array
+        if (Array.isArray(parsed.panelSizes) && parsed.panelSizes.length >= 2) {
+          setPreferences({ ...defaultPreferences, ...parsed });
+        }
       }
     } catch (error) {
       console.error("Failed to load editor preferences:", error);
@@ -196,7 +204,6 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
     >
       {/* Sidebar - File Tree */}
       <ResizablePanel
-        id="sidebar"
         defaultSize={preferences.panelSizes[0]}
         minSize={10}
         maxSize={30}
@@ -235,7 +242,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
       <ResizableHandle withHandle />
 
       {/* Main Editor Area */}
-      <ResizablePanel id="main" defaultSize={preferences.panelSizes[1]}>
+      <ResizablePanel defaultSize={preferences.panelSizes[1]}>
         <div className="h-full flex flex-col">
           {/* Toolbar */}
           <div className="border-b bg-white dark:bg-zinc-950 px-4 py-2 flex items-center justify-between">

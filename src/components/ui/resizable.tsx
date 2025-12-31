@@ -2,32 +2,18 @@
 
 import * as React from "react"
 import { GripVerticalIcon } from "lucide-react"
-import { Group, Panel, Separator } from "react-resizable-panels"
-import type { Layout } from "react-resizable-panels"
+import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels"
 
 import { cn } from "@/lib/utils"
 
-// Re-export types
-export type { Layout }
-
-interface ResizablePanelGroupProps extends Omit<React.ComponentProps<typeof Group>, 'orientation' | 'onLayoutChange'> {
-  direction?: "horizontal" | "vertical"
-  onLayout?: (sizes: number[]) => void
-}
-
 function ResizablePanelGroup({
   className,
-  direction = "horizontal",
-  onLayout,
   ...props
-}: ResizablePanelGroupProps) {
+}: React.ComponentProps<typeof PanelGroup>) {
   return (
-    <Group
-      data-slot="resizable-panel-group"
-      orientation={direction}
-      onLayoutChange={onLayout}
+    <PanelGroup
       className={cn(
-        "flex h-full w-full",
+        "flex h-full w-full data-[panel-group-direction=vertical]:flex-col",
         className
       )}
       {...props}
@@ -39,37 +25,30 @@ function ResizablePanel({
   className,
   ...props
 }: React.ComponentProps<typeof Panel>) {
-  return (
-    <Panel
-      data-slot="resizable-panel"
-      className={cn("", className)}
-      {...props}
-    />
-  )
+  return <Panel className={cn("", className)} {...props} />
 }
 
 function ResizableHandle({
   withHandle,
   className,
   ...props
-}: React.ComponentProps<typeof Separator> & {
+}: React.ComponentProps<typeof PanelResizeHandle> & {
   withHandle?: boolean
 }) {
   return (
-    <Separator
-      data-slot="resizable-handle"
+    <PanelResizeHandle
       className={cn(
-        "relative flex w-2 cursor-col-resize items-center justify-center bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 transition-colors",
+        "relative flex w-px items-center justify-center bg-zinc-200 after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 focus-visible:ring-offset-1 data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0 [&[data-panel-group-direction=vertical]>div]:rotate-90 dark:bg-zinc-800 dark:focus-visible:ring-zinc-300",
         className
       )}
       {...props}
     >
       {withHandle && (
-        <div className="z-10 flex h-8 w-4 items-center justify-center rounded-sm bg-zinc-300 dark:bg-zinc-600 border border-zinc-400 dark:border-zinc-500">
-          <GripVerticalIcon className="size-3 text-zinc-600 dark:text-zinc-300" />
+        <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-zinc-200 dark:bg-zinc-800">
+          <GripVerticalIcon className="h-2.5 w-2.5" />
         </div>
       )}
-    </Separator>
+    </PanelResizeHandle>
   )
 }
 
