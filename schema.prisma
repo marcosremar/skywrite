@@ -1,0 +1,253 @@
+// Prisma Schema for Thesis Writer
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ AUTH ============
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
+  emailVerified DateTime?
+  image         String?
+
+  // Subscription
+  subscriptionStatus SubscriptionStatus @default(FREE)
+  monthlyBuilds      Int                @default(0)
+  monthlyBuildsReset DateTime           @default(now())
+  storageUsedBytes   BigInt             @default(0)
+
+  // Relations
+  projects Project[]
+  accounts Account[]
+  sessions Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum SubscriptionStatus {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+// ============ PROJECTS ============
+
+model Project {
+  id          String  @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+
+  // Metadata (from metadata.yaml)
+  title      String?
+  subtitle   String?
+  author     String?
+  university String?
+  degree     String?
+  language   String  @default("pt-BR")
+
+  // Storage
+  storageKey String @unique // S3/R2 prefix for project files
+
+  // Settings
+  templateId String?
+  settings   Json    @default("{}")
+
+  // Relations
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  files     ProjectFile[]
+  builds    Build[]
+  citations Citation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model ProjectFile {
+  id        String @id @default(cuid())
+  projectId String
+
+  // File info
+  path      String   // e.g., "chapters/01-introduction.md"
+  name      String   // e.g., "01-introduction.md"
+  type      FileType
+  mimeType  String?
+  sizeBytes Int      @default(0)
+
+  // For text files, store content directly
+  content String? @db.Text
+
+  // For media files, store S3/R2 key
+  storageKey String?
+
+  // Metadata
+  checksum String? // MD5 for change detection
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, path])
+  @@index([projectId])
+}
+
+enum FileType {
+  MARKDOWN
+  YAML
+  BIBTEX
+  LATEX
+  IMAGE
+  PDF
+  OTHER
+}
+
+// ============ BIBLIOGRAPHY ============
+
+model Citation {
+  id        String @id @default(cuid())
+  projectId String
+
+  // BibTeX fields
+  citationKey String // e.g., "krashen1984"
+  entryType   String // e.g., "article", "book"
+
+  // Common fields
+  title     String?
+  author    String?
+  year      String?
+  journal   String?
+  publisher String?
+  volume    String?
+  pages     String?
+  doi       String?
+  url       String?
+
+  // Full BibTeX entry
+  rawBibtex String @db.Text
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, citationKey])
+  @@index([projectId])
+}
+
+// ============ BUILDS ============
+
+model Build {
+  id        String @id @default(cuid())
+  projectId String
+
+  // Build info
+  type   BuildType   @default(FULL)
+  status BuildStatus @default(QUEUED)
+
+  // Timing
+  queuedAt    DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  durationMs  Int?
+
+  // Output
+  pdfUrl       String?
+  pdfSizeBytes Int?
+  pageCount    Int?
+
+  // Logs and errors
+  logs         String? @db.Text
+  errorMessage String?
+  errorDetails Json?
+
+  // Source snapshot
+  sourceHash String? // Hash of source files at build time
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+}
+
+enum BuildType {
+  FULL    // Full PDF build
+  PREVIEW // Quick preview (first few pages)
+  DRAFT   // Draft mode (faster, less formatting)
+}
+
+enum BuildStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ============ TEMPLATES ============
+
+model Template {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  category    String  // e.g., "thesis", "article", "report"
+
+  // Template files stored in S3/R2
+  storageKey String
+  thumbnail  String? // Preview image URL
+
+  // Metadata
+  isPublic  Boolean @default(true)
+  downloads Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
