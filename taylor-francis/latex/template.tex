@@ -1,0 +1,57 @@
+% Taylor & Francis Journal Article Template
+% Main document structure
+
+\documentclass[]{article}
+
+$for(header-includes)$
+$header-includes$
+$endfor$
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{natbib}
+\usepackage{hyperref}
+
+% Document metadata
+$if(title)$
+\title{$title$}
+$endif$
+
+$if(author)$
+\author{$for(author)$$author$$sep$ \and $endfor$}
+$endif$
+
+$if(date)$
+\date{$date$}
+$else$
+\date{}
+$endif$
+
+\begin{document}
+
+$if(title)$
+\maketitle
+$endif$
+
+$if(abstract)$
+\begin{abstract}
+$abstract$
+\end{abstract}
+$endif$
+
+$if(keywords)$
+\noindent\textbf{Keywords:} $for(keywords)$$keywords$$sep$; $endfor$
+\vspace{1em}
+$endif$
+
+$body$
+
+$if(bibliography)$
+\bibliographystyle{apalike}
+\bibliography{$for(bibliography)$$bibliography$$sep$,$endfor$}
+$endif$
+
+\end{document}
