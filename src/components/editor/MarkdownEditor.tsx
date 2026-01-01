@@ -6,7 +6,7 @@ import { undo, redo } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
-import { Extension, RangeSetBuilder } from "@codemirror/state";
+import { Extension } from "@codemirror/state";
 import { autocompletion, CompletionContext, CompletionResult, startCompletion } from "@codemirror/autocomplete";
 
 // Citation widget that shows formatted citation with clickable individual citations
@@ -118,7 +118,8 @@ class ImageWidget extends WidgetType {
     return false;
   }
 }
-import { syntaxTree } from "@codemirror/language";
+import { syntaxTree, syntaxHighlighting, HighlightStyle } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
 
 interface MarkdownEditorProps {
   value: string;
@@ -220,28 +221,45 @@ function createCitationAutocomplete(bibEntries: BibEntry[]) {
   };
 }
 
-// Obsidian-like dark theme with Live Preview support
+// Dark theme with green accents and dark gray background
 const obsidianTheme = EditorView.theme({
   "&": {
-    color: "#dcddde",
-    backgroundColor: "#1e1e1e",
+    color: "#e5e5e5",
+    backgroundColor: "#0a0a0a",
     fontSize: "16px",
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif",
   },
+  "& .cm-line span:not(.cm-lp-link)": {
+    textDecoration: "none !important",
+  },
   ".cm-content": {
-    caretColor: "#528bff",
+    caretColor: "#4ade80",
     lineHeight: "1.8",
     padding: "20px 32px",
   },
   ".cm-cursor, .cm-dropCursor": {
-    borderLeftColor: "#528bff",
+    borderLeftColor: "#4ade80",
     borderLeftWidth: "2px",
+    visibility: "visible",
   },
-  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
-    backgroundColor: "#3d4752",
+  "&.cm-focused .cm-cursor": {
+    animation: "cm-blink 1s step-end infinite",
+  },
+  "@keyframes cm-blink": {
+    "0%, 100%": { visibility: "visible" },
+    "50%": { visibility: "hidden" },
+  },
+  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
+    backgroundColor: "rgba(74, 222, 128, 0.15)",
+  },
+  ".cm-content ::selection": {
+    backgroundColor: "rgba(74, 222, 128, 0.25)",
+  },
+  ".cm-selectionMatch": {
+    backgroundColor: "rgba(74, 222, 128, 0.1)",
   },
   ".cm-activeLine": {
-    backgroundColor: "#232528",
+    backgroundColor: "transparent",
   },
   ".cm-gutters": {
     display: "none",
@@ -249,48 +267,62 @@ const obsidianTheme = EditorView.theme({
   ".cm-scroller": {
     overflow: "auto",
   },
-  // Formatted text styles
+  ".cm-header, .cm-header-1, .cm-header-2, .cm-header-3, .cm-header-4, .cm-header-5, .cm-header-6": {
+    textDecoration: "none !important",
+  },
+  ".tok-heading, .tok-heading1, .tok-heading2, .tok-heading3": {
+    textDecoration: "none !important",
+  },
+  ".cmt-heading, .cmt-heading1, .cmt-heading2, .cmt-heading3, .cmt-heading4, .cmt-heading5, .cmt-heading6": {
+    textDecoration: "none !important",
+  },
+  '[class*="ͼ"]': {
+    textDecoration: "none !important",
+  },
   ".cm-lp-h1": {
     fontSize: "2em",
     fontWeight: "700",
-    color: "#ffffff",
+    color: "#4ade80",
     lineHeight: "1.3",
+    textDecoration: "none",
   },
   ".cm-lp-h2": {
     fontSize: "1.6em",
     fontWeight: "600",
-    color: "#f0f0f0",
+    color: "#86efac",
     lineHeight: "1.3",
+    textDecoration: "none",
   },
   ".cm-lp-h3": {
     fontSize: "1.3em",
     fontWeight: "600",
-    color: "#e0e0e0",
+    color: "#a7f3d0",
     lineHeight: "1.3",
+    textDecoration: "none",
   },
   ".cm-lp-h4, .cm-lp-h5, .cm-lp-h6": {
     fontSize: "1.1em",
     fontWeight: "600",
-    color: "#d0d0d0",
+    color: "#bbf7d0",
+    textDecoration: "none",
   },
   ".cm-lp-strong": {
     fontWeight: "bold",
-    color: "#e5c07b",
+    color: "#fbbf24",
   },
   ".cm-lp-emphasis": {
     fontStyle: "italic",
-    color: "#98c379",
+    color: "#34d399",
   },
   ".cm-lp-code": {
     fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    backgroundColor: "#2c313a",
+    backgroundColor: "#1a1a1a",
     padding: "2px 6px",
     borderRadius: "4px",
-    color: "#98c379",
+    color: "#4ade80",
   },
   ".cm-lp-link": {
-    color: "#61afef",
-    textDecoration: "underline",
+    color: "#22d3ee",
   },
   ".cm-lp-hidden": {
     fontSize: "0",
@@ -301,19 +333,19 @@ const obsidianTheme = EditorView.theme({
   },
   // Blockquote styling
   ".cm-quote": {
-    borderLeft: "3px solid #4b5263",
+    borderLeft: "3px solid #22c55e",
     paddingLeft: "16px",
-    color: "#abb2bf",
+    color: "#a7f3d0",
     fontStyle: "italic",
   },
   // List styling
   ".cm-list": {
-    color: "#c678dd",
+    color: "#4ade80",
   },
   // Citation widget styling - container
   ".cm-citation-widget-container": {
-    color: "#61afef",
-    backgroundColor: "#2c313a",
+    color: "#4ade80",
+    backgroundColor: "#1a1a1a",
     padding: "2px 4px",
     borderRadius: "4px",
     fontSize: "inherit",
@@ -324,19 +356,19 @@ const obsidianTheme = EditorView.theme({
     whiteSpace: "nowrap",
   },
   ".cm-citation-paren": {
-    color: "#61afef",
+    color: "#4ade80",
     padding: "0",
     margin: "0",
     lineHeight: "1",
   },
   ".cm-citation-separator": {
-    color: "#abb2bf",
+    color: "#86efac",
     padding: "0",
     margin: "0",
     lineHeight: "1",
   },
   ".cm-citation-item": {
-    color: "#61afef",
+    color: "#4ade80",
     cursor: "pointer",
     padding: "0 1px",
     borderRadius: "3px",
@@ -344,12 +376,12 @@ const obsidianTheme = EditorView.theme({
     lineHeight: "1",
   },
   ".cm-citation-item:hover": {
-    backgroundColor: "#3d4752",
+    backgroundColor: "#262626",
   },
   // Legacy support for old class name
   ".cm-citation-widget": {
-    color: "#61afef",
-    backgroundColor: "#2c313a",
+    color: "#4ade80",
+    backgroundColor: "#1a1a1a",
     padding: "2px 6px",
     borderRadius: "4px",
     cursor: "pointer",
@@ -357,53 +389,53 @@ const obsidianTheme = EditorView.theme({
     fontFamily: "inherit",
   },
   ".cm-citation-widget:hover": {
-    backgroundColor: "#3d4752",
+    backgroundColor: "#262626",
   },
   // Autocomplete dropdown styling
   ".cm-tooltip-autocomplete": {
-    backgroundColor: "#2c313a !important",
-    border: "1px solid #4b5263 !important",
+    backgroundColor: "#0a0a0a !important",
+    border: "1px solid #22c55e !important",
     borderRadius: "6px !important",
-    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4) !important",
+    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.5) !important",
   },
   ".cm-tooltip-autocomplete ul": {
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif !important",
   },
   ".cm-tooltip-autocomplete ul li": {
     padding: "6px 12px !important",
-    color: "#dcddde !important",
+    color: "#e5e5e5 !important",
   },
   ".cm-tooltip-autocomplete ul li[aria-selected]": {
-    backgroundColor: "#3d4752 !important",
+    backgroundColor: "#262626 !important",
     color: "#ffffff !important",
   },
   ".cm-completionLabel": {
-    color: "#61afef !important",
+    color: "#4ade80 !important",
   },
   ".cm-completionDetail": {
-    color: "#abb2bf !important",
+    color: "#86efac !important",
     marginLeft: "8px !important",
     fontStyle: "italic",
   },
   // Citation in raw markdown - make it clickable
   ".cm-citation-raw": {
-    color: "#61afef",
+    color: "#4ade80",
     cursor: "pointer",
-    backgroundColor: "rgba(97, 175, 239, 0.1)",
+    backgroundColor: "#1a1a1a",
     borderRadius: "3px",
     padding: "0 2px",
   },
   ".cm-citation-raw:hover": {
-    backgroundColor: "rgba(97, 175, 239, 0.2)",
+    backgroundColor: "#262626",
   },
   // Image widget styles
   ".cm-image-widget": {
     display: "block",
     margin: "12px 0",
     padding: "8px",
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    backgroundColor: "#141414",
     borderRadius: "8px",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
+    border: "1px solid #262626",
     textAlign: "center",
   },
   ".cm-image-preview": {
@@ -411,22 +443,37 @@ const obsidianTheme = EditorView.theme({
     maxHeight: "400px",
     objectFit: "contain",
     borderRadius: "4px",
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
   },
   ".cm-image-caption": {
     marginTop: "8px",
     fontSize: "12px",
-    color: "#abb2bf",
+    color: "#86efac",
     fontStyle: "italic",
   },
   ".cm-image-error": {
     padding: "20px",
-    color: "#e06c75",
+    color: "#f87171",
     fontSize: "12px",
-    backgroundColor: "rgba(224, 108, 117, 0.1)",
+    backgroundColor: "rgba(248, 113, 113, 0.1)",
     borderRadius: "4px",
   },
 });
+
+// Custom highlight style with green theme
+const customHighlightStyle = HighlightStyle.define([
+  { tag: tags.heading, textDecoration: "none", fontWeight: "bold", color: "#4ade80" },
+  { tag: tags.heading1, textDecoration: "none", fontWeight: "bold", color: "#4ade80" },
+  { tag: tags.heading2, textDecoration: "none", fontWeight: "bold", color: "#86efac" },
+  { tag: tags.heading3, textDecoration: "none", fontWeight: "bold", color: "#a7f3d0" },
+  { tag: tags.heading4, textDecoration: "none", fontWeight: "bold", color: "#bbf7d0" },
+  { tag: tags.heading5, textDecoration: "none", fontWeight: "bold", color: "#bbf7d0" },
+  { tag: tags.heading6, textDecoration: "none", fontWeight: "bold", color: "#bbf7d0" },
+  { tag: tags.link, color: "#22d3ee", textDecoration: "none" },
+  { tag: tags.emphasis, fontStyle: "italic", color: "#34d399" },
+  { tag: tags.strong, fontWeight: "bold", color: "#fbbf24" },
+  { tag: tags.monospace, fontFamily: "'JetBrains Mono', 'Fira Code', monospace", color: "#4ade80" },
+]);
 
 // Decoration marks
 const hiddenMark = Decoration.mark({ class: "cm-lp-hidden" });
@@ -468,8 +515,15 @@ if (typeof window !== "undefined") {
 }
 
 // Get all lines that contain the cursor or selection
+// Only returns active lines when editor is focused - otherwise all lines show rendered preview
 function getActiveLines(view: EditorView): Set<number> {
   const activeLines = new Set<number>();
+
+  // If editor is not focused, return empty set so all lines show rendered preview
+  if (!view.hasFocus) {
+    return activeLines;
+  }
+
   for (const range of view.state.selection.ranges) {
     const startLine = view.state.doc.lineAt(range.from).number;
     const endLine = view.state.doc.lineAt(range.to).number;
@@ -706,39 +760,40 @@ function createLivePreviewDecorations(view: EditorView): DecorationSet {
     }
   }
 
-  // Sort decorations by 'from' position (required by CodeMirror)
-  decorations.sort((a, b) => a.from - b.from);
+  // Filter valid decorations and create ranges
+  const ranges = decorations
+    .filter(({ from, to }) => from < to)
+    .map(({ from, to, decoration }) => decoration.range(from, to));
 
-  // Build the decoration set
-  const builder = new RangeSetBuilder<Decoration>();
-  for (const { from, to, decoration } of decorations) {
-    if (from < to) {
-      builder.add(from, to, decoration);
-    }
-  }
-
-  return builder.finish();
+  // Use Decoration.set with sort=true to handle ordering automatically
+  return Decoration.set(ranges, true);
 }
 
-// ViewPlugin for live preview
-const livePreviewPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+// Factory function to create live preview plugin
+function createLivePreviewPlugin() {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
 
-    constructor(view: EditorView) {
-      this.decorations = createLivePreviewDecorations(view);
-    }
+      constructor(view: EditorView) {
+        this.decorations = createLivePreviewDecorations(view);
+      }
 
-    update(update: ViewUpdate) {
-      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+      update(update: ViewUpdate) {
+        // Always recompute decorations to handle:
+        // - Document changes
+        // - Selection changes (active line detection)
+        // - Viewport changes
+        // - Focus changes (show/hide raw markdown)
+        // - Async syntax tree parsing completion
         this.decorations = createLivePreviewDecorations(update.view);
       }
+    },
+    {
+      decorations: (v) => v.decorations,
     }
-  },
-  {
-    decorations: (v) => v.decorations,
-  }
-);
+  );
+}
 
 // Line wrapping
 const lineWrapping = EditorView.lineWrapping;
@@ -901,17 +956,17 @@ function CitationModal({
   return (
     <div
       ref={modalRef}
-      className="fixed z-50 bg-[#2c313a] border border-[#4b5263] rounded-lg shadow-xl max-h-80 w-80 overflow-hidden"
+      className="fixed z-50 bg-card border border-primary/30 rounded-lg shadow-xl max-h-80 w-80 overflow-hidden"
       style={{ left: position.x, top: position.y }}
     >
       {/* Search input */}
-      <div className="p-2 border-b border-[#4b5263]">
+      <div className="p-2 border-b border-border">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar referencia..."
-          className="w-full px-3 py-2 bg-[#1e1e1e] border border-[#4b5263] rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#61afef]"
+          className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
           autoFocus
         />
       </div>
@@ -919,7 +974,7 @@ function CitationModal({
       {/* Results list */}
       <div className="overflow-y-auto max-h-60">
         {filteredEntries.length === 0 ? (
-          <div className="p-4 text-center text-gray-500 text-sm">
+          <div className="p-4 text-center text-muted-foreground text-sm">
             Nenhuma referencia encontrada
           </div>
         ) : (
@@ -932,16 +987,16 @@ function CitationModal({
                   onSelect(entry.key);
                   onClose();
                 }}
-                className="w-full px-3 py-2 text-left hover:bg-[#3d4752] flex flex-col gap-0.5 border-b border-[#4b5263]/50 last:border-b-0"
+                className="w-full px-3 py-2 text-left hover:bg-accent flex flex-col gap-0.5 border-b border-border/50 last:border-b-0"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-[#61afef] font-mono text-sm">@{entry.key}</span>
-                  <span className="text-gray-400 text-xs">
+                  <span className="text-primary font-mono text-sm">@{entry.key}</span>
+                  <span className="text-muted-foreground text-xs">
                     {authorShort}, {entry.year || "n.d."}
                   </span>
                 </div>
                 {entry.title && (
-                  <span className="text-gray-300 text-xs truncate">{entry.title}</span>
+                  <span className="text-foreground/80 text-xs truncate">{entry.title}</span>
                 )}
               </button>
             );
@@ -1124,24 +1179,23 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
   const bibEntries = useMemo(() => parseBibTeX(bibContent), [bibContent]);
 
   // Extensions for CodeMirror with Live Preview
-  const extensions: Extension[] = useMemo(
-    () => [
-      markdown({
-        base: markdownLanguage,
-        codeLanguages: languages,
-        addKeymap: true,
-      }),
-      livePreviewPlugin,
-      lineWrapping,
-      citationClickHandler,
-      autocompletion({
-        override: [createCitationAutocomplete(bibEntries)],
-        activateOnTyping: true,
-        icons: false,
-      }),
-    ],
-    [bibEntries]
-  );
+  // Create fresh extensions each time to ensure proper initialization
+  const extensions: Extension[] = [
+    markdown({
+      base: markdownLanguage,
+      codeLanguages: languages,
+      addKeymap: true,
+    }),
+    syntaxHighlighting(customHighlightStyle),
+    createLivePreviewPlugin(),
+    lineWrapping,
+    citationClickHandler,
+    autocompletion({
+      override: [createCitationAutocomplete(bibEntries)],
+      activateOnTyping: true,
+      icons: false,
+    }),
+  ];
 
   const handleCitationSelect = useCallback((key: string) => {
     // If we have a replaceMode, replace the specific citation in the document
@@ -1214,9 +1268,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
   }, []);
 
   return (
-    <div className="h-full flex flex-col bg-[#1e1e1e]">
+    <div className="h-full flex flex-col bg-background">
       {/* File name header */}
-      <div className="px-4 py-2 border-b border-zinc-800 bg-[#252526] text-sm text-zinc-400 flex items-center gap-2">
+      <div className="px-4 py-2 border-b border-border bg-card text-sm text-muted-foreground flex items-center gap-2">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="16"
@@ -1227,7 +1281,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="text-blue-400"
+          className="text-primary"
         >
           <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
           <polyline points="14 2 14 8 20 8" />
@@ -1249,6 +1303,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
           placeholder={placeholderText}
           height="100%"
           style={{ height: "100%" }}
+          autoFocus={false}
           basicSetup={{
             lineNumbers: false,
             highlightActiveLineGutter: false,
