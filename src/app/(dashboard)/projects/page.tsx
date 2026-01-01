@@ -28,8 +28,8 @@ export default async function ProjectsPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Meus Projetos</h1>
-          <p className="text-zinc-500">
+          <h1 className="text-3xl font-bold text-foreground">Meus Projetos</h1>
+          <p className="text-muted-foreground">
             Gerencie suas teses e documentos academicos
           </p>
         </div>
@@ -45,7 +45,7 @@ export default async function ProjectsPage() {
             <h2 className="text-xl font-semibold mb-2">
               Nenhum projeto ainda
             </h2>
-            <p className="text-zinc-500 mb-4">
+            <p className="text-muted-foreground mb-4">
               Crie seu primeiro projeto para comecar a escrever
             </p>
             <Link href="/projects/new">
@@ -68,11 +68,11 @@ export default async function ProjectsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex gap-4 text-sm text-zinc-500">
+                  <div className="flex gap-4 text-sm text-muted-foreground">
                     <span>{project._count.files} arquivos</span>
                     <span>{project._count.builds} builds</span>
                   </div>
-                  <p className="text-xs text-zinc-400 mt-2">
+                  <p className="text-xs text-muted-foreground/70 mt-2">
                     Atualizado em{" "}
                     {new Date(project.updatedAt).toLocaleDateString("pt-BR")}
                   </p>

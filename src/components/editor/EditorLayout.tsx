@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { FileTree } from "./FileTree";
 import { MarkdownEditor, MarkdownEditorRef } from "./MarkdownEditor";
 import { EditorToolbar } from "./EditorToolbar";
@@ -20,6 +21,7 @@ import {
   EyeOff,
   Maximize2,
   Minimize2,
+  ArrowLeft,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -126,13 +128,11 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   const bibFile = useMemo(() => files.find((f) => f.path.endsWith(".bib")), [files]);
   const bibContent = bibFile?.content || "";
 
-  // Get all markdown content for analysis
-  const allContent = useMemo(() => {
-    return files
-      .filter(f => f.type === "MARKDOWN")
-      .map(f => f.content || "")
-      .join("\n\n");
-  }, [files]);
+  // Get current file content for analysis (updated when content changes)
+  const currentFileContent = useMemo(() => {
+    // Use the current content state which reflects unsaved changes
+    return content;
+  }, [content]);
 
   const handleFileSelect = useCallback((file: ProjectFile) => {
     // Force complete unmount by clearing first, then set new file
@@ -318,6 +318,20 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
               <div className="flex items-center justify-between">
                 {/* Left: Toggle & Editor Tools */}
                 <div className="flex items-center gap-1">
+                  {/* Back to projects */}
+                  <Link href="/projects">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      title="Voltar para projetos"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                  </Link>
+
+                  <div className="h-5 w-px bg-border mx-1" />
+
                   {/* Sidebar toggle */}
                   <Button
                     variant="ghost"
@@ -552,7 +566,11 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
               maxSize={40}
               className="advisor-panel"
             >
-              <AIAdvisor content={allContent} />
+              <AIAdvisor
+                key={`advisor-${selectedFile?.id || "no-file"}`}
+                content={currentFileContent}
+                fileName={selectedFile?.name || ""}
+              />
             </ResizablePanel>
           </>
         )}

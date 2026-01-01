@@ -187,10 +187,16 @@ function createCitationAutocomplete(bibEntries: BibEntry[]) {
       ? afterBracket.slice(lastSemicolon + 1).trim().replace(/^@/, "")
       : afterBracket.replace(/^@/, "");
 
-    // Calculate where to start the completion
+    // Check if there's already a closing bracket after the cursor
+    const docText = context.state.doc.toString();
+    const hasClosingBracket = docText.charAt(context.pos) === ']';
+
+    // Calculate where to start the replacement
+    // For new citation: replace from after [@
+    // For adding to existing: replace from after the last semicolon
     const from = lastSemicolon >= 0
-      ? before.from + 2 + lastSemicolon + 1 + (afterBracket.slice(lastSemicolon + 1).match(/^\s*@?/)?.[0].length || 0)
-      : before.from + 2 + (afterBracket.match(/^@?/)?.[0].length || 0);
+      ? before.from + 2 + lastSemicolon + 1 + (afterBracket.slice(lastSemicolon + 1).match(/^\s*/)?.[0].length || 0)
+      : before.from + 2;
 
     const options = bibEntries
       .filter(entry => {
@@ -204,12 +210,16 @@ function createCitationAutocomplete(bibEntries: BibEntry[]) {
       })
       .map(entry => {
         const authorShort = entry.author?.split(",")[0]?.split(" and ")[0] || "Unknown";
+
+        // Build the apply text - add closing bracket if not present
+        const applyText = hasClosingBracket ? `@${entry.key}` : `@${entry.key}]`;
+
         return {
           label: `@${entry.key}`,
           detail: `${authorShort}, ${entry.year || "n.d."}`,
           info: entry.title,
           type: "variable" as const,
-          apply: `@${entry.key}`,
+          apply: applyText,
         };
       });
 
@@ -391,31 +401,88 @@ const obsidianTheme = EditorView.theme({
   ".cm-citation-widget:hover": {
     backgroundColor: "#262626",
   },
-  // Autocomplete dropdown styling
+  // Autocomplete dropdown styling - dark theme with green accents
+  ".cm-tooltip": {
+    backgroundColor: "#141414 !important",
+    border: "1px solid #262626 !important",
+    borderRadius: "8px !important",
+    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(74, 222, 128, 0.1) !important",
+    overflow: "hidden !important",
+    zIndex: "1000 !important",
+  },
   ".cm-tooltip-autocomplete": {
-    backgroundColor: "#0a0a0a !important",
-    border: "1px solid #22c55e !important",
-    borderRadius: "6px !important",
-    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.5) !important",
+    backgroundColor: "#141414 !important",
+    border: "none !important",
+    minWidth: "280px !important",
+    maxWidth: "400px !important",
+    position: "absolute !important",
+    marginTop: "2px !important",
+    left: "0 !important",
   },
-  ".cm-tooltip-autocomplete ul": {
+  ".cm-tooltip-autocomplete > ul": {
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif !important",
+    padding: "4px !important",
+    maxHeight: "300px !important",
   },
-  ".cm-tooltip-autocomplete ul li": {
-    padding: "6px 12px !important",
-    color: "#e5e5e5 !important",
+  ".cm-tooltip-autocomplete > ul > li": {
+    padding: "8px 12px !important",
+    borderRadius: "6px !important",
+    margin: "2px 0 !important",
+    display: "flex !important",
+    flexDirection: "column !important",
+    gap: "2px !important",
+    cursor: "pointer !important",
+    transition: "background-color 0.15s ease !important",
   },
-  ".cm-tooltip-autocomplete ul li[aria-selected]": {
-    backgroundColor: "#262626 !important",
+  ".cm-tooltip-autocomplete > ul > li:hover": {
+    backgroundColor: "#1f1f1f !important",
+  },
+  ".cm-tooltip-autocomplete > ul > li[aria-selected]": {
+    backgroundColor: "rgba(74, 222, 128, 0.15) !important",
     color: "#ffffff !important",
+  },
+  ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionLabel": {
+    color: "#4ade80 !important",
   },
   ".cm-completionLabel": {
     color: "#4ade80 !important",
+    fontWeight: "500 !important",
+    fontSize: "14px !important",
   },
   ".cm-completionDetail": {
-    color: "#86efac !important",
-    marginLeft: "8px !important",
-    fontStyle: "italic",
+    color: "#a1a1aa !important",
+    marginLeft: "auto !important",
+    fontSize: "12px !important",
+    fontStyle: "normal !important",
+    opacity: "0.8 !important",
+  },
+  ".cm-completionInfo": {
+    backgroundColor: "#1a1a1a !important",
+    color: "#a1a1aa !important",
+    border: "1px solid #262626 !important",
+    borderRadius: "6px !important",
+    padding: "8px 12px !important",
+    fontSize: "12px !important",
+    maxWidth: "300px !important",
+    marginLeft: "4px !important",
+  },
+  ".cm-completionIcon": {
+    display: "none !important",
+  },
+  ".cm-completionMatchedText": {
+    color: "#22c55e !important",
+    fontWeight: "600 !important",
+    textDecoration: "none !important",
+  },
+  // Custom citation option styling
+  ".cm-citation-option": {
+    display: "flex !important",
+    alignItems: "center !important",
+    justifyContent: "space-between !important",
+  },
+  // Tooltip positioning - let CodeMirror calculate the position
+  ".cm-tooltip.cm-tooltip-autocomplete": {
+    // Position is calculated by CodeMirror based on cursor position
   },
   // Citation in raw markdown - make it clickable
   ".cm-citation-raw": {
@@ -761,8 +828,20 @@ function createLivePreviewDecorations(view: EditorView): DecorationSet {
   }
 
   // Filter valid decorations and create ranges
+  // IMPORTANT: Filter out any decorations that span multiple lines to avoid
+  // "Decorations that replace line breaks may not be specified via plugins" error
   const ranges = decorations
-    .filter(({ from, to }) => from < to)
+    .filter(({ from, to }) => {
+      if (from >= to) return false;
+      // Ensure decoration doesn't span multiple lines
+      try {
+        const startLine = doc.lineAt(from).number;
+        const endLine = doc.lineAt(to).number;
+        return startLine === endLine;
+      } catch {
+        return false;
+      }
+    })
     .map(({ from, to, decoration }) => decoration.range(from, to));
 
   // Use Decoration.set with sort=true to handle ordering automatically
@@ -776,7 +855,12 @@ function createLivePreviewPlugin() {
       decorations: DecorationSet;
 
       constructor(view: EditorView) {
-        this.decorations = createLivePreviewDecorations(view);
+        try {
+          this.decorations = createLivePreviewDecorations(view);
+        } catch (e) {
+          console.error("Error creating decorations:", e);
+          this.decorations = Decoration.none;
+        }
       }
 
       update(update: ViewUpdate) {
@@ -786,7 +870,12 @@ function createLivePreviewPlugin() {
         // - Viewport changes
         // - Focus changes (show/hide raw markdown)
         // - Async syntax tree parsing completion
-        this.decorations = createLivePreviewDecorations(update.view);
+        try {
+          this.decorations = createLivePreviewDecorations(update.view);
+        } catch (e) {
+          console.error("Error updating decorations:", e);
+          this.decorations = Decoration.none;
+        }
       }
     },
     {
@@ -909,13 +998,43 @@ function CitationModal({
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
+  const [adjustedPosition, setAdjustedPosition] = useState(position);
   const modalRef = useRef<HTMLDivElement>(null);
+
+  // Modal dimensions
+  const MODAL_HEIGHT = 320; // max-h-80 = 20rem = 320px
+  const MODAL_WIDTH = 320;  // w-80 = 20rem = 320px
 
   useEffect(() => {
     if (isOpen) {
       setSearch("");
+
+      // Calculate if modal would overflow viewport
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+
+      let newY = position.y;
+      let newX = position.x;
+
+      // Check if modal would overflow bottom of viewport
+      if (position.y + MODAL_HEIGHT > viewportHeight - 20) {
+        // Position above the click point instead (subtract modal height + some offset)
+        newY = position.y - MODAL_HEIGHT - 30;
+        // Make sure it doesn't go above viewport
+        if (newY < 10) newY = 10;
+      }
+
+      // Check if modal would overflow right of viewport
+      if (position.x + MODAL_WIDTH > viewportWidth - 20) {
+        newX = viewportWidth - MODAL_WIDTH - 20;
+      }
+
+      // Make sure it doesn't go off left side
+      if (newX < 10) newX = 10;
+
+      setAdjustedPosition({ x: newX, y: newY });
     }
-  }, [isOpen]);
+  }, [isOpen, position]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -957,7 +1076,7 @@ function CitationModal({
     <div
       ref={modalRef}
       className="fixed z-50 bg-card border border-primary/30 rounded-lg shadow-xl max-h-80 w-80 overflow-hidden"
-      style={{ left: position.x, top: position.y }}
+      style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
     >
       {/* Search input */}
       <div className="p-2 border-b border-border">
@@ -1194,6 +1313,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
       override: [createCitationAutocomplete(bibEntries)],
       activateOnTyping: true,
       icons: false,
+      aboveCursor: false, // Always show below cursor
+      defaultKeymap: true,
+      optionClass: () => "cm-citation-option",
     }),
   ];
 

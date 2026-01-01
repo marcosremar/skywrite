@@ -45,6 +45,7 @@ export async function POST(
       // Prepare project data for Python script
       const projectData = {
         project_id: id,
+        template_id: project.templateId || null,
         files: project.files.map((f) => ({
           path: f.path,
           content: f.content,
@@ -142,12 +143,16 @@ async function runDockerBuild(projectData: object): Promise<BuildResult> {
     const mkdirSync = require("fs").mkdirSync;
     mkdirSync(hostBuildDir, { recursive: true });
 
+    // Templates directory
+    const templatesDir = path.join(process.cwd(), "templates");
+
     // Docker run command with volume mount for output
     const docker = spawn("docker", [
       "run",
       "--rm",
       "-i",
       "-v", `${coreDir}:/app/core:ro`,
+      "-v", `${templatesDir}:/app/templates:ro`,
       "-v", `${hostBuildDir}:/tmp/thesis-build-${projectId}`,
       builderImage,
     ], {
@@ -175,8 +180,12 @@ async function runDockerBuild(projectData: object): Promise<BuildResult> {
       if (resultMatch) {
         try {
           const result = JSON.parse(resultMatch[1].trim());
-          // Map container path to host path
-          const hostPdfPath = path.join(hostBuildDir, "thesis.pdf");
+          // Map container path to host path - check for both main.pdf (template) and thesis.pdf (default)
+          let hostPdfPath = path.join(hostBuildDir, "main.pdf");
+          const fsSync = require("fs");
+          if (!fsSync.existsSync(hostPdfPath)) {
+            hostPdfPath = path.join(hostBuildDir, "thesis.pdf");
+          }
           resolve({
             success: result.success,
             pdfPath: hostPdfPath,  // Use host path instead of container path

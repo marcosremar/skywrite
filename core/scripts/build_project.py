@@ -25,6 +25,44 @@ import re
 SCRIPT_DIR = Path(__file__).parent
 CORE_DIR = SCRIPT_DIR.parent  # core/scripts/../ = core/
 THEME_DIR = CORE_DIR / "theme"
+TEMPLATES_DIR = CORE_DIR.parent / "templates"  # thesis-writer/templates/
+
+
+def load_template_config(template_id: str) -> dict:
+    """Load template configuration from template.json"""
+    if not template_id:
+        return None
+
+    template_dir = TEMPLATES_DIR / template_id
+    config_file = template_dir / "template.json"
+
+    if config_file.exists():
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            config['_template_dir'] = str(template_dir)
+            return config
+    return None
+
+
+def get_template_latex_files(template_id: str) -> dict:
+    """Get LaTeX files from template (preamble, template)"""
+    if not template_id:
+        return {}
+
+    template_dir = TEMPLATES_DIR / template_id / "latex"
+    result = {}
+
+    preamble_file = template_dir / "preamble.tex"
+    if preamble_file.exists():
+        result['preamble'] = preamble_file.read_text(encoding='utf-8')
+        result['preamble_path'] = str(preamble_file)
+
+    template_file = template_dir / "template.tex"
+    if template_file.exists():
+        result['template'] = template_file.read_text(encoding='utf-8')
+        result['template_path'] = str(template_file)
+
+    return result
 
 
 def setup_build_directory(project_id: str) -> Path:
@@ -77,6 +115,7 @@ def write_project_files(content_dir: Path, files: list) -> dict:
     """
     organized = {
         'chapters': [],
+        'sections': [],  # For template-based projects (journal articles)
         'structure': [],
         'appendices': [],
         'bibliography': [],
@@ -120,6 +159,8 @@ def write_project_files(content_dir: Path, files: list) -> dict:
             elif file_path.endswith('.md'):
                 if 'chapters/' in file_path:
                     organized['chapters'].append(full_path)
+                elif 'sections/' in file_path:
+                    organized['sections'].append(full_path)
                 elif 'structure/' in file_path:
                     organized['structure'].append(full_path)
                 elif 'appendices/' in file_path:
@@ -129,7 +170,7 @@ def write_project_files(content_dir: Path, files: list) -> dict:
                     organized['chapters'].append(full_path)
 
     # Sort all lists
-    for key in ['chapters', 'structure', 'appendices', 'bibliography', 'media']:
+    for key in ['chapters', 'sections', 'structure', 'appendices', 'bibliography', 'media']:
         organized[key] = sorted(organized[key])
 
     return organized
@@ -305,6 +346,92 @@ def generate_strings_tex(build_dir: Path, metadata: dict) -> Path:
     return output_file
 
 
+def generate_template_main_tex(build_dir: Path, organized_files: dict, metadata: dict, template_config: dict, template_latex: dict) -> Path:
+    """Generate main.tex using template-based approach (for journal articles)"""
+    output_file = build_dir / "main.tex"
+
+    # Get content from converted markdown files
+    content_parts = []
+    for md_file in organized_files['chapters']:
+        tex_file = build_dir / md_file.with_suffix('.tex').name
+        if tex_file.exists():
+            tex_content = tex_file.read_text(encoding='utf-8')
+            content_parts.append(tex_content)
+
+    # Also include sections if they exist
+    sections_dir = organized_files.get('sections', [])
+    for section_file in sections_dir:
+        tex_file = build_dir / section_file.with_suffix('.tex').name
+        if tex_file.exists():
+            tex_content = tex_file.read_text(encoding='utf-8')
+            content_parts.append(tex_content)
+
+    body_content = "\n\n".join(content_parts)
+
+    # Build the document using the template
+    document_class = template_config.get('documentClass', 'article')
+    citation_style = template_config.get('citationStyle', 'apalike')
+
+    # Get bibliography path
+    bib_path = ""
+    if organized_files['bibliography']:
+        bib_path = str(organized_files['bibliography'][0])
+
+    # Generate document
+    content = f"""% Generated from template: {template_config.get('name', 'Unknown')}
+\\documentclass[12pt,a4paper]{{{document_class}}}
+
+% Preamble from template
+{template_latex.get('preamble', '')}
+
+% Document metadata
+\\title{{{metadata.get('title', 'Untitled')}}}
+\\author{{{metadata.get('author', '')}}}
+\\date{{{metadata.get('date', '')}}}
+
+\\begin{{document}}
+
+\\maketitle
+
+"""
+
+    # Add abstract if present
+    abstract = metadata.get('abstract', '')
+    if abstract:
+        content += f"""\\begin{{abstract}}
+{abstract}
+\\end{{abstract}}
+
+"""
+
+    # Add keywords if present
+    keywords = metadata.get('keywords', [])
+    if keywords:
+        keywords_str = "; ".join(keywords) if isinstance(keywords, list) else keywords
+        content += f"""\\noindent\\textbf{{Keywords:}} {keywords_str}
+\\vspace{{1em}}
+
+"""
+
+    # Add body content
+    content += body_content
+
+    # Add bibliography
+    if bib_path:
+        content += f"""
+
+\\bibliographystyle{{{citation_style}}}
+\\bibliography{{{bib_path}}}
+"""
+
+    content += """
+\\end{document}
+"""
+
+    output_file.write_text(content, encoding='utf-8')
+    return output_file
+
+
 def generate_main_tex(build_dir: Path, organized_files: dict, metadata: dict, theme_dir: Path) -> Path:
     """Generate main thesis.tex file"""
     output_file = build_dir / "thesis.tex"
@@ -453,13 +580,60 @@ def compile_pdf(build_dir: Path) -> Path:
         return None
 
 
+def compile_template_pdf(build_dir: Path) -> Path:
+    """Compile LaTeX to PDF for template-based projects"""
+    main_tex = build_dir / "main.tex"
+    main_pdf = build_dir / "main.pdf"
+
+    print("\nCompiling PDF with latexmk...")
+
+    cmd = [
+        "latexmk",
+        "-pdf",
+        "-interaction=nonstopmode",
+        "-f",  # Force completion even with errors
+        f"-output-directory={build_dir}",
+        "-cd",
+        str(main_tex)
+    ]
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        cwd=build_dir
+    )
+
+    # Decode output with error handling
+    try:
+        stdout = result.stdout.decode('utf-8', errors='replace') if result.stdout else ''
+    except:
+        stdout = str(result.stdout)
+
+    try:
+        stderr = result.stderr.decode('utf-8', errors='replace') if result.stderr else ''
+    except:
+        stderr = str(result.stderr)
+
+    if main_pdf.exists():
+        print(f"  PDF generated: {main_pdf}")
+        return main_pdf
+    else:
+        print(f"  Error compiling PDF")
+        print(f"  stdout: {stdout[-2000:] if stdout else 'none'}")
+        print(f"  stderr: {stderr[-2000:] if stderr else 'none'}")
+        return None
+
+
 def build_project(project_data: dict) -> dict:
     """Main build function - takes project data, returns build result"""
     project_id = project_data.get('project_id', 'unknown')
     files = project_data.get('files', [])
+    template_id = project_data.get('template_id', None)
 
     print("=" * 60)
     print(f"Building project: {project_id}")
+    if template_id:
+        print(f"Using template: {template_id}")
     print("=" * 60)
 
     # Setup directories
@@ -469,7 +643,18 @@ def build_project(project_data: dict) -> dict:
     print(f"\nBuild directory: {build_dir}")
     print(f"Content directory: {content_dir}")
 
-    # Copy theme to build directory
+    # Load template configuration if provided
+    template_config = None
+    template_latex = {}
+    if template_id:
+        template_config = load_template_config(template_id)
+        if template_config:
+            print(f"\nTemplate loaded: {template_config.get('name', 'Unknown')}")
+            template_latex = get_template_latex_files(template_id)
+        else:
+            print(f"\nWarning: Template '{template_id}' not found, using default theme")
+
+    # Copy theme to build directory (for fallback)
     print("\nCopying theme files...")
     theme_dir = copy_theme_to_build(build_dir)
 
@@ -485,7 +670,9 @@ def build_project(project_data: dict) -> dict:
 
     # Convert Markdown to LaTeX
     print("\nConverting Markdown to LaTeX...")
-    all_md_files = organized['chapters'] + organized['structure'] + organized['appendices']
+
+    # Include sections for template-based projects
+    all_md_files = organized['chapters'] + organized['sections'] + organized['structure'] + organized['appendices']
 
     # Pass bibliography files to pandoc for citation processing
     bib_files = [str(f) for f in organized['bibliography']]
@@ -493,20 +680,28 @@ def build_project(project_data: dict) -> dict:
     for md_file in all_md_files:
         convert_md_to_tex(md_file, build_dir, content_dir, bib_files)
 
-    # Generate main thesis.tex
-    print("\nGenerating main thesis.tex...")
-    main_tex = generate_main_tex(build_dir, organized, metadata, theme_dir)
-    print(f"  Created: {main_tex}")
-
-    # Compile PDF
-    pdf_path = compile_pdf(build_dir)
+    # Generate main document based on template or theme
+    if template_config:
+        print("\nGenerating main.tex from template...")
+        main_tex = generate_template_main_tex(build_dir, organized, metadata, template_config, template_latex)
+        print(f"  Created: {main_tex}")
+        # Compile with template-specific function
+        pdf_path = compile_template_pdf(build_dir)
+    else:
+        # Generate main thesis.tex using default theme
+        print("\nGenerating main thesis.tex...")
+        main_tex = generate_main_tex(build_dir, organized, metadata, theme_dir)
+        print(f"  Created: {main_tex}")
+        # Compile PDF
+        pdf_path = compile_pdf(build_dir)
 
     # Return result
     result = {
         'success': pdf_path is not None,
         'project_id': project_id,
         'build_dir': str(build_dir),
-        'pdf_path': str(pdf_path) if pdf_path else None
+        'pdf_path': str(pdf_path) if pdf_path else None,
+        'template_id': template_id
     }
 
     print("\n" + "=" * 60)

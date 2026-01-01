@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
+import { getTemplate, getTemplateDefaultFiles } from "@/lib/templates";
 
 // GET /api/projects - List user's projects
 export async function GET() {
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, title, language } = await request.json();
+    const { name, title, language, templateId } = await request.json();
 
     if (!name) {
       return NextResponse.json(
@@ -51,17 +52,40 @@ export async function POST(request: Request) {
     // Generate unique storage key
     const storageKey = `${session.user.id}/${randomUUID()}`;
 
-    // Create project with default files
+    // Get files based on template or use defaults
+    let files;
+    let template = null;
+
+    if (templateId) {
+      template = await getTemplate(templateId);
+      if (template) {
+        const templateFiles = await getTemplateDefaultFiles(templateId);
+        files = templateFiles.map(f => ({
+          path: f.path,
+          name: f.name,
+          type: f.type as "YAML" | "MARKDOWN" | "BIBTEX" | "LATEX",
+          content: f.content,
+        }));
+      }
+    }
+
+    // Fall back to default files if no template or template not found
+    if (!files || files.length === 0) {
+      files = getDefaultFiles(title || name);
+    }
+
+    // Create project with files
     const project = await db.project.create({
       data: {
         userId: session.user.id,
         name,
         title,
-        language: language || "pt-BR",
+        language: language || template?.language || "pt-BR",
         storageKey,
         author: session.user.name || "",
+        templateId: templateId || null,
         files: {
-          create: getDefaultFiles(title || name),
+          create: files,
         },
       },
       include: {

@@ -1,0 +1,35 @@
+# Taylor & Francis Article Metadata
+title: "Your Article Title Here"
+subtitle: ""
+author:
+  - name: "First Author"
+    affiliation: "University/Institution"
+    email: "author@email.com"
+  - name: "Second Author"
+    affiliation: "University/Institution"
+    email: "author2@email.com"
+date: "2024"
+
+# Journal Information
+journal: "Journal Name"
+
+# Abstract
+abstract: |
+  Write your abstract here. The abstract should be a single paragraph
+  of approximately 150-250 words summarizing the key aspects of your
+  research including objectives, methods, results, and conclusions.
+
+# Keywords (3-6 keywords)
+keywords:
+  - "keyword 1"
+  - "keyword 2"
+  - "keyword 3"
+
+# Document Settings
+lang: "en-US"
+papersize: "a4"
+fontsize: "12pt"
+
+# Bibliography
+bibliography: "bibliography/references.bib"
+bibstyle: "apalike"

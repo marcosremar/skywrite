@@ -318,7 +318,7 @@ export function FileTree({
               <ContextMenu>
                 <ContextMenuTrigger asChild>
                   {dir !== "root" ? (
-                    <div className="flex items-center justify-between gap-1 px-2 py-1 text-sm font-medium text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md cursor-pointer group">
+                    <div className="flex items-center justify-between gap-1 px-2 py-1 text-sm font-medium text-muted-foreground hover:bg-accent rounded-md cursor-pointer group">
                       <div className="flex items-center gap-1">
                         <span>{getDirIcon(dir)}</span>
                         <span>{dir}</span>
@@ -374,9 +374,9 @@ export function FileTree({
                       onClick={() => onSelect(file)}
                       onDoubleClick={() => handleDoubleClick(file)}
                       className={cn(
-                        "w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left cursor-pointer group",
+                        "w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md hover:bg-accent transition-colors text-left cursor-pointer group",
                         selectedFile?.id === file.id &&
-                          "bg-zinc-100 dark:bg-zinc-800 font-medium"
+                          "bg-accent text-accent-foreground font-medium"
                       )}
                     >
                       <span>{getFileIcon(file)}</span>
@@ -492,7 +492,7 @@ export function FileTree({
           <div className="py-4">
             <ul className="list-disc pl-4 space-y-1">
               {referencingFiles.map((path) => (
-                <li key={path} className="text-sm text-zinc-600">
+                <li key={path} className="text-sm text-muted-foreground">
                   {path}
                 </li>
               ))}

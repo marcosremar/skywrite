@@ -1,0 +1,36 @@
+{
+  "id": "taylor-francis",
+  "name": "Taylor & Francis Journal",
+  "description": "Template oficial para artigos de periódicos Taylor & Francis. Formato padrão usado em mais de 2.700 revistas acadêmicas.",
+  "category": "journal",
+  "publisher": "Taylor & Francis",
+  "language": "en-US",
+  "citationStyle": "apa",
+  "documentClass": "interact",
+  "features": [
+    "Formato APA para citações",
+    "Suporte a figuras e tabelas",
+    "Numeração automática de seções",
+    "Bibliografia com natbib"
+  ],
+  "requiredSections": [
+    "abstract",
+    "keywords",
+    "introduction"
+  ],
+  "packages": [
+    "natbib",
+    "amsmath",
+    "amsthm",
+    "amssymb",
+    "booktabs",
+    "graphicx",
+    "hyperref"
+  ],
+  "metadata": {
+    "journal": "",
+    "keywords": [],
+    "authors": []
+  },
+  "thumbnail": "/templates/taylor-francis/preview.png"
+}

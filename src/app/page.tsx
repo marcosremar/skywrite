@@ -10,12 +10,12 @@ import {
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white dark:from-zinc-950 dark:to-zinc-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm dark:bg-zinc-950/80">
+      <header className="border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-zinc-900 dark:text-white">
+            <span className="text-2xl font-bold text-primary">
               Thesis Writer
             </span>
           </div>
@@ -32,14 +32,14 @@ export default function Home() {
 
       {/* Hero */}
       <section className="container mx-auto px-4 py-24 text-center">
-        <h1 className="mx-auto max-w-4xl text-5xl font-bold tracking-tight text-zinc-900 dark:text-white sm:text-6xl">
+        <h1 className="mx-auto max-w-4xl text-5xl font-bold tracking-tight text-foreground sm:text-6xl">
           Escreva sua tese em{" "}
           <span className="text-primary">Markdown</span>
           <br />
           Exporte em{" "}
           <span className="text-primary">PDF profissional</span>
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
+        <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
           Editor intuitivo com preview em tempo real. Suporte a citacoes,
           cross-references, e formatacao academica automatica. Sem precisar
           saber LaTeX.
@@ -60,7 +60,7 @@ export default function Home() {
 
       {/* Features */}
       <section id="features" className="container mx-auto px-4 py-24">
-        <h2 className="mb-12 text-center text-3xl font-bold text-zinc-900 dark:text-white">
+        <h2 className="mb-12 text-center text-3xl font-bold text-foreground">
           Tudo que voce precisa para sua tese
         </h2>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -74,7 +74,7 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="text-sm text-muted-foreground">
                 Titulos, listas, negrito, italico, blocos de codigo e muito
                 mais. Tudo com a sintaxe simples do Markdown.
               </p>
@@ -91,7 +91,7 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="text-sm text-muted-foreground">
                 Use [@autor2023] e a referencia aparece automaticamente na
                 bibliografia. Suporte a APA, ABNT e outros estilos.
               </p>
@@ -108,7 +108,7 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="text-sm text-muted-foreground">
                 Use [@fig:minha-figura] e o numero da figura e atualizado
                 automaticamente. Mesmo com [@sec:secao] e [@tbl:tabela].
               </p>
@@ -125,7 +125,7 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="text-sm text-muted-foreground">
                 Atualizacao automatica do preview conforme voce edita. Sem
                 precisar compilar manualmente.
               </p>
@@ -142,7 +142,7 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="text-sm text-muted-foreground">
                 USP, UNICAMP, UFRJ, Sorbonne, e muitas outras. Formatacao
                 correta garantida.
               </p>
@@ -159,7 +159,7 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="text-sm text-muted-foreground">
                 Escreva em portugues, exporte em frances ou ingles. Citacoes e
                 referencias preservadas.
               </p>
@@ -170,7 +170,7 @@ export default function Home() {
 
       {/* Pricing */}
       <section className="container mx-auto px-4 py-24">
-        <h2 className="mb-12 text-center text-3xl font-bold text-zinc-900 dark:text-white">
+        <h2 className="mb-12 text-center text-3xl font-bold text-foreground">
           Precos Simples
         </h2>
         <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
@@ -178,10 +178,10 @@ export default function Home() {
             <CardHeader>
               <CardTitle>Gratis</CardTitle>
               <CardDescription>Para comecar</CardDescription>
-              <p className="text-4xl font-bold">R$0</p>
+              <p className="text-4xl font-bold text-primary">R$0</p>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>1 projeto</li>
                 <li>10 builds/mes</li>
                 <li>100MB de armazenamento</li>
@@ -199,10 +199,10 @@ export default function Home() {
             <CardHeader>
               <CardTitle>Pro</CardTitle>
               <CardDescription>Para quem leva a serio</CardDescription>
-              <p className="text-4xl font-bold">R$29/mes</p>
+              <p className="text-4xl font-bold text-primary">R$29/mes</p>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>Projetos ilimitados</li>
                 <li>Builds ilimitados</li>
                 <li>10GB de armazenamento</li>
@@ -219,20 +219,20 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t bg-zinc-50 dark:bg-zinc-950">
+      <footer className="border-t border-border bg-card">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="text-sm text-muted-foreground">
               2025 Thesis Writer. Feito para academicos.
             </p>
-            <nav className="flex gap-4 text-sm text-zinc-600 dark:text-zinc-400">
-              <Link href="/terms" className="hover:text-zinc-900 dark:hover:text-white">
+            <nav className="flex gap-4 text-sm text-muted-foreground">
+              <Link href="/terms" className="hover:text-primary">
                 Termos
               </Link>
-              <Link href="/privacy" className="hover:text-zinc-900 dark:hover:text-white">
+              <Link href="/privacy" className="hover:text-primary">
                 Privacidade
               </Link>
-              <Link href="/docs" className="hover:text-zinc-900 dark:hover:text-white">
+              <Link href="/docs" className="hover:text-primary">
                 Documentacao
               </Link>
             </nav>

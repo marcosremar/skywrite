@@ -14,30 +14,41 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
-  TrendingUp,
   Target,
   BookOpen,
   MessageSquare,
   Send,
+  XCircle,
+  Plus,
+  Settings2,
+  Trash2,
+  Shield,
+  User,
 } from "lucide-react";
 import type {
   ThesisAnalysis,
   SectionFeedback,
   SectionType,
+  Rule,
+  RuleResult,
 } from "@/types/thesis-analysis";
 import {
   getScoreLabel,
   getScoreColor,
+  SYSTEM_RULES,
+  SECTION_LABELS,
 } from "@/types/thesis-analysis";
-import { analyzeThesis } from "@/lib/thesis-analysis";
+import { analyzeThesis, getAllRules, saveUserRules } from "@/lib/thesis-analysis";
 
 interface AIAdvisorProps {
   content: string;
+  fileName?: string;
   className?: string;
 }
 
 export function AIAdvisor({
   content,
+  fileName,
   className,
 }: AIAdvisorProps) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -46,27 +57,46 @@ export function AIAdvisor({
   );
   const [analysis, setAnalysis] = useState<ThesisAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastContentRef = useRef<string>("");
 
-  // Auto-analyze when content changes (debounced)
+  // Auto-analyze when content changes (debounced - waits 3 seconds after user stops typing)
   useEffect(() => {
-    if (!content || content.trim().length < 50) {
-      return;
-    }
-
     // Clear previous timeout
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
-    setIsAnalyzing(true);
-
-    // Debounce analysis by 1 second after user stops typing
-    debounceRef.current = setTimeout(() => {
-      const result = analyzeThesis(content);
-      setAnalysis(result);
+    // Reset analysis if content is empty or too short
+    if (!content || content.trim().length < 50) {
+      setAnalysis(null);
       setIsAnalyzing(false);
-    }, 1000);
+      setPendingUpdate(false);
+      return;
+    }
+
+    // Skip if content hasn't actually changed
+    if (content === lastContentRef.current) {
+      return;
+    }
+
+    // Show subtle indicator that update is pending (not the loading spinner)
+    setPendingUpdate(true);
+
+    // Wait 3 seconds after user stops typing before analyzing
+    debounceRef.current = setTimeout(() => {
+      setIsAnalyzing(true);
+      setPendingUpdate(false);
+
+      // Small delay to show analyzing state, then compute
+      requestAnimationFrame(() => {
+        const result = analyzeThesis(content);
+        lastContentRef.current = content;
+        setAnalysis(result);
+        setIsAnalyzing(false);
+      });
+    }, 3000);
 
     return () => {
       if (debounceRef.current) {
@@ -74,6 +104,15 @@ export function AIAdvisor({
       }
     };
   }, [content]);
+
+  // Initial analysis when component mounts (no delay)
+  useEffect(() => {
+    if (content && content.trim().length >= 50 && !analysis) {
+      const result = analyzeThesis(content);
+      lastContentRef.current = content;
+      setAnalysis(result);
+    }
+  }, []);
 
   const toggleSection = (section: SectionType) => {
     setExpandedSections((prev) => {
@@ -92,27 +131,38 @@ export function AIAdvisor({
       {/* Header */}
       <div className="p-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-primary/10">
-              <Bot className="h-4 w-4 text-primary" />
-            </div>
-            Orientador Virtual
-          </h3>
+          <div>
+            <h3 className="font-semibold flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-primary/10">
+                <Bot className="h-4 w-4 text-primary" />
+              </div>
+              Orientador Virtual
+            </h3>
+            {fileName && (
+              <p className="text-xs text-muted-foreground mt-1 ml-8">
+                Analisando: {fileName}
+              </p>
+            )}
+          </div>
 
-          {isAnalyzing ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
+          {analysis ? (
+            <div className="relative">
+              <ProgressRing
+                progress={analysis.overallScore}
+                size={44}
+                strokeWidth={3}
+              />
+              {/* Subtle dot indicator when update is pending */}
+              {pendingUpdate && (
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary rounded-full animate-pulse" />
+              )}
             </div>
-          ) : analysis ? (
-            <ProgressRing
-              progress={analysis.overallScore}
-              size={44}
-              strokeWidth={3}
-            />
+          ) : isAnalyzing ? (
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           ) : null}
         </div>
 
-        {isAnalyzing ? (
+        {isAnalyzing && !analysis ? (
           <p className="text-sm text-muted-foreground">
             Analisando documento...
           </p>
@@ -121,13 +171,19 @@ export function AIAdvisor({
             <span className={cn("font-medium", getScoreColor(analysis.overallScore))}>
               {getScoreLabel(analysis.overallScore)}
             </span>
-            <span className="text-muted-foreground">
-              - Atualizado:{" "}
-              {new Date(analysis.analyzedAt).toLocaleTimeString("pt-BR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
+            {pendingUpdate ? (
+              <span className="text-muted-foreground text-xs">
+                - Atualizando em breve...
+              </span>
+            ) : (
+              <span className="text-muted-foreground">
+                - Atualizado:{" "}
+                {new Date(analysis.analyzedAt).toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            )}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -138,25 +194,29 @@ export function AIAdvisor({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="mx-4 mt-3 grid grid-cols-3">
+        <TabsList className="mx-4 mt-3 grid grid-cols-4">
           <TabsTrigger value="overview" className="text-xs">
             <Target className="h-3 w-3 mr-1" />
-            Visao Geral
+            Geral
           </TabsTrigger>
           <TabsTrigger value="sections" className="text-xs">
             <BookOpen className="h-3 w-3 mr-1" />
-            Por Secao
+            Secao
+          </TabsTrigger>
+          <TabsTrigger value="rules" className="text-xs">
+            <Settings2 className="h-3 w-3 mr-1" />
+            Regras
           </TabsTrigger>
           <TabsTrigger value="chat" className="text-xs">
             <MessageSquare className="h-3 w-3 mr-1" />
-            Perguntar
+            Chat
           </TabsTrigger>
         </TabsList>
 
         <ScrollArea className="flex-1">
           {/* Overview Tab */}
           <TabsContent value="overview" className="p-4 m-0">
-            {isAnalyzing ? (
+            {!analysis && isAnalyzing ? (
               <AnalyzingState />
             ) : !analysis ? (
               <WaitingState />
@@ -167,10 +227,20 @@ export function AIAdvisor({
 
           {/* Sections Tab */}
           <TabsContent value="sections" className="p-4 m-0">
-            {isAnalyzing ? (
+            {!analysis && isAnalyzing ? (
               <AnalyzingState />
             ) : !analysis ? (
               <WaitingState />
+            ) : analysis.sections.length === 0 ? (
+              <div className="text-center py-8">
+                <BookOpen className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma secao identificada neste documento.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Adicione um titulo como &ldquo;# Introducao&rdquo; para comecar.
+                </p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {analysis.sections.map((section) => (
@@ -183,6 +253,11 @@ export function AIAdvisor({
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          {/* Rules Tab */}
+          <TabsContent value="rules" className="p-4 m-0">
+            <RulesManager />
           </TabsContent>
 
           {/* Chat Tab */}
@@ -304,24 +379,94 @@ function OverviewContent({ analysis }: { analysis: ThesisAnalysis }) {
         </div>
       )}
 
-      {/* Next Steps */}
-      {analysis.summary.nextSteps.length > 0 && (
+      {/* Rules */}
+      {analysis.rules.results.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-sm font-medium flex items-center gap-2">
-            <Lightbulb className="h-4 w-4 text-primary" />
-            Proximos Passos
-          </h4>
-          <div className="space-y-2">
-            {analysis.summary.nextSteps.map((step, i) => (
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Shield className="h-4 w-4 text-primary" />
+              Regras ({analysis.rules.passedCount}/{analysis.rules.totalCount})
+            </h4>
+          </div>
+          <div className="space-y-1.5">
+            {analysis.rules.results.map((result, i) => (
               <div
-                key={i}
-                className="flex items-start gap-2 text-sm p-2 rounded-lg bg-primary/5 border border-primary/10"
+                key={result.rule.id}
+                className={cn(
+                  "flex items-start gap-2 text-sm p-2 rounded-lg border",
+                  result.passed
+                    ? "bg-green-500/5 border-green-500/20"
+                    : "bg-red-500/5 border-red-500/20"
+                )}
               >
-                <TrendingUp className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                <span>{step}</span>
+                {result.passed ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={result.passed ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+                      {result.rule.label}
+                    </span>
+                    {result.rule.isSystemRule ? (
+                      <Shield className="h-3 w-3 text-muted-foreground" />
+                    ) : (
+                      <User className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  {!result.passed && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {result.rule.description}
+                    </p>
+                  )}
+                  {result.passed && result.matchedAt && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Encontrado: {result.matchedAt}
+                    </p>
+                  )}
+                </div>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Uncited Assertions */}
+      {analysis.citations.uncitedAssertions.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-500" />
+              Afirmacoes sem Citacao ({analysis.citations.uncitedAssertions.length})
+            </h4>
+            <span className="text-xs text-muted-foreground">
+              {analysis.citations.citedAssertions}/{analysis.citations.totalAssertions} citadas
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {analysis.citations.uncitedAssertions.map((assertion, i) => (
+              <div
+                key={i}
+                className="p-2 rounded-lg bg-orange-500/5 border border-orange-500/20 text-sm"
+              >
+                <div className="flex items-start gap-2">
+                  <XCircle className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-orange-600 dark:text-orange-400 font-medium mb-0.5">
+                      {assertion.assertionType} - Linha {assertion.lineNumber}
+                    </p>
+                    <p className="text-xs text-muted-foreground break-words">
+                      &ldquo;{assertion.text}&rdquo;
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground italic">
+            Adicione referencias para dar credibilidade as afirmacoes.
+          </p>
         </div>
       )}
 
@@ -473,6 +618,227 @@ function SectionCard({
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function RulesManager() {
+  const [rules, setRules] = useState<Rule[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newRule, setNewRule] = useState({
+    label: "",
+    description: "",
+    pattern: "",
+    section: null as SectionType | null,
+  });
+
+  // Load rules on mount
+  useEffect(() => {
+    setRules(getAllRules());
+  }, []);
+
+  const handleAddRule = () => {
+    if (!newRule.label || !newRule.pattern) return;
+
+    const rule: Rule = {
+      id: `user-${Date.now()}`,
+      label: newRule.label,
+      description: newRule.description || newRule.label,
+      pattern: newRule.pattern,
+      section: newRule.section,
+      isSystemRule: false,
+      isEnabled: true,
+    };
+
+    const updatedRules = [...rules, rule];
+    setRules(updatedRules);
+    saveUserRules(updatedRules.filter(r => !r.isSystemRule));
+
+    // Reset form
+    setNewRule({ label: "", description: "", pattern: "", section: null });
+    setShowAddForm(false);
+  };
+
+  const handleDeleteRule = (ruleId: string) => {
+    const updatedRules = rules.filter(r => r.id !== ruleId);
+    setRules(updatedRules);
+    saveUserRules(updatedRules.filter(r => !r.isSystemRule));
+  };
+
+  const handleToggleRule = (ruleId: string) => {
+    const updatedRules = rules.map(r =>
+      r.id === ruleId ? { ...r, isEnabled: !r.isEnabled } : r
+    );
+    setRules(updatedRules);
+    // Save all rules state (including system rule toggles)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('thesis-writer-rules-state', JSON.stringify(
+        updatedRules.map(r => ({ id: r.id, isEnabled: r.isEnabled }))
+      ));
+    }
+    saveUserRules(updatedRules.filter(r => !r.isSystemRule));
+  };
+
+  // Group rules by section
+  const generalRules = rules.filter(r => r.section === null);
+  const sectionRules = rules.filter(r => r.section !== null);
+
+  return (
+    <div className="space-y-4">
+      {/* Add Rule Button */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setShowAddForm(!showAddForm)}
+        className="w-full gap-2"
+      >
+        <Plus className="h-4 w-4" />
+        Nova Regra
+      </Button>
+
+      {/* Add Rule Form */}
+      {showAddForm && (
+        <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-3">
+          <div>
+            <label className="text-xs font-medium mb-1 block">Nome da Regra</label>
+            <input
+              type="text"
+              value={newRule.label}
+              onChange={(e) => setNewRule(prev => ({ ...prev, label: e.target.value }))}
+              placeholder="Ex: Possui metodologia clara"
+              className="w-full px-2 py-1.5 text-sm rounded border border-border bg-background"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block">Palavras-chave (separadas por |)</label>
+            <input
+              type="text"
+              value={newRule.pattern}
+              onChange={(e) => setNewRule(prev => ({ ...prev, pattern: e.target.value }))}
+              placeholder="Ex: metodologia|metodo|procedimento"
+              className="w-full px-2 py-1.5 text-sm rounded border border-border bg-background"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block">Secao (opcional)</label>
+            <select
+              value={newRule.section || ""}
+              onChange={(e) => setNewRule(prev => ({
+                ...prev,
+                section: e.target.value ? e.target.value as SectionType : null
+              }))}
+              className="w-full px-2 py-1.5 text-sm rounded border border-border bg-background"
+            >
+              <option value="">Geral (todas as secoes)</option>
+              <option value="introduction">Introducao</option>
+              <option value="literature-review">Revisao de Literatura</option>
+              <option value="methodology">Metodologia</option>
+              <option value="results">Resultados</option>
+              <option value="discussion">Discussao</option>
+              <option value="conclusion">Conclusao</option>
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleAddRule} className="flex-1">
+              Adicionar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowAddForm(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* General Rules */}
+      {generalRules.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Regras Gerais
+          </h4>
+          <div className="space-y-1">
+            {generalRules.map(rule => (
+              <RuleItem
+                key={rule.id}
+                rule={rule}
+                onToggle={() => handleToggleRule(rule.id)}
+                onDelete={() => handleDeleteRule(rule.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Section Rules */}
+      {sectionRules.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Regras por Secao
+          </h4>
+          <div className="space-y-1">
+            {sectionRules.map(rule => (
+              <RuleItem
+                key={rule.id}
+                rule={rule}
+                onToggle={() => handleToggleRule(rule.id)}
+                onDelete={() => handleDeleteRule(rule.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RuleItem({
+  rule,
+  onToggle,
+  onDelete,
+}: {
+  rule: Rule;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className={cn(
+      "flex items-center gap-2 p-2 rounded-lg border text-sm",
+      rule.isEnabled ? "bg-card border-border" : "bg-muted/30 border-border/50 opacity-60"
+    )}>
+      <button
+        onClick={onToggle}
+        className="shrink-0"
+      >
+        {rule.isEnabled ? (
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+        ) : (
+          <XCircle className="h-4 w-4 text-muted-foreground" />
+        )}
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="font-medium truncate">{rule.label}</span>
+          {rule.isSystemRule ? (
+            <Shield className="h-3 w-3 text-muted-foreground shrink-0" />
+          ) : (
+            <User className="h-3 w-3 text-primary shrink-0" />
+          )}
+        </div>
+        {rule.section && (
+          <span className="text-xs text-muted-foreground">
+            {SECTION_LABELS[rule.section]}
+          </span>
+        )}
+      </div>
+
+      {!rule.isSystemRule && (
+        <button
+          onClick={onDelete}
+          className="p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       )}
     </div>
   );

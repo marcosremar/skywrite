@@ -143,32 +143,32 @@ function CitationForm({
   };
 
   return (
-    <div className="border rounded-lg bg-white dark:bg-zinc-900 overflow-hidden">
+    <div className="border border-border rounded-lg bg-card overflow-hidden">
       {/* Header - always visible */}
-      <div className="p-3 bg-zinc-50 dark:bg-zinc-800 flex items-center gap-3">
+      <div className="p-3 bg-muted flex items-center gap-3">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="text-zinc-500 hover:text-zinc-700"
+          className="text-muted-foreground hover:text-foreground"
         >
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-xs text-blue-600 dark:text-blue-400">
+            <span className="font-mono text-xs text-primary">
               @{citation.key}
             </span>
-            <span className="text-xs px-2 py-0.5 bg-zinc-200 dark:bg-zinc-700 rounded">
+            <span className="text-xs px-2 py-0.5 bg-secondary rounded text-secondary-foreground">
               {getTypeLabel(citation.type)}
             </span>
           </div>
-          <p className="text-sm font-medium truncate mt-1">{citation.title || "Sem titulo"}</p>
-          <p className="text-xs text-zinc-500 truncate">{formatCitation(citation)}</p>
+          <p className="text-sm font-medium truncate mt-1 text-foreground">{citation.title || "Sem titulo"}</p>
+          <p className="text-xs text-muted-foreground truncate">{formatCitation(citation)}</p>
         </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={onDelete}
-          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
         >
           <Trash2 className="h-4 w-4" />
         </Button>
@@ -180,25 +180,25 @@ function CitationForm({
           {/* Row 1: Key and Type */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 Chave (ID)
               </label>
               <input
                 type="text"
                 value={citation.key}
                 onChange={(e) => updateField("key", e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
                 placeholder="ex: silva2023"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 Tipo de Referencia
               </label>
               <select
                 value={citation.type}
                 onChange={(e) => updateField("type", e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
               >
                 {REFERENCE_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -211,14 +211,14 @@ function CitationForm({
 
           {/* Row 2: Title */}
           <div>
-            <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            <label className="block text-xs font-medium text-foreground mb-1">
               Titulo
             </label>
             <input
               type="text"
               value={citation.title}
               onChange={(e) => updateField("title", e.target.value)}
-              className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+              className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
               placeholder="Titulo da obra"
             />
           </div>
@@ -226,26 +226,26 @@ function CitationForm({
           {/* Row 3: Author and Year */}
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 Autor(es)
               </label>
               <input
                 type="text"
                 value={citation.author}
                 onChange={(e) => updateField("author", e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
                 placeholder="Sobrenome, Nome and Sobrenome, Nome"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 Ano
               </label>
               <input
                 type="text"
                 value={citation.year}
                 onChange={(e) => updateField("year", e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
                 placeholder="2023"
               />
             </div>
@@ -255,26 +255,26 @@ function CitationForm({
           {(citation.type === "article") && (
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                <label className="block text-xs font-medium text-foreground mb-1">
                   Periodico
                 </label>
                 <input
                   type="text"
                   value={citation.journal || ""}
                   onChange={(e) => updateField("journal", e.target.value)}
-                  className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
                   placeholder="Nome do periodico"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                <label className="block text-xs font-medium text-foreground mb-1">
                   Volume
                 </label>
                 <input
                   type="text"
                   value={citation.volume || ""}
                   onChange={(e) => updateField("volume", e.target.value)}
-                  className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
                   placeholder="ex: 42"
                 />
               </div>
@@ -283,14 +283,14 @@ function CitationForm({
 
           {(citation.type === "inproceedings") && (
             <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 Nome da Conferencia
               </label>
               <input
                 type="text"
                 value={citation.booktitle || ""}
                 onChange={(e) => updateField("booktitle", e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
                 placeholder="Nome da conferencia ou evento"
               />
             </div>
@@ -298,14 +298,14 @@ function CitationForm({
 
           {(citation.type === "book" || citation.type === "incollection") && (
             <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 Editora
               </label>
               <input
                 type="text"
                 value={citation.publisher || ""}
                 onChange={(e) => updateField("publisher", e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
                 placeholder="Nome da editora"
               />
             </div>
@@ -314,26 +314,26 @@ function CitationForm({
           {/* Row: Pages and DOI */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 Paginas
               </label>
               <input
                 type="text"
                 value={citation.pages || ""}
                 onChange={(e) => updateField("pages", e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
                 placeholder="ex: 1-15"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 DOI
               </label>
               <input
                 type="text"
                 value={citation.doi || ""}
                 onChange={(e) => updateField("doi", e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
                 placeholder="10.xxxx/xxxxx"
               />
             </div>
@@ -341,14 +341,14 @@ function CitationForm({
 
           {/* URL */}
           <div>
-            <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            <label className="block text-xs font-medium text-foreground mb-1">
               URL
             </label>
             <input
               type="text"
               value={citation.url || ""}
               onChange={(e) => updateField("url", e.target.value)}
-              className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-zinc-800"
+              className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
               placeholder="https://..."
             />
           </div>
@@ -442,7 +442,7 @@ export function BibliographyEditor({ bibContent, onSave }: BibliographyEditorPro
                 placeholder="Buscar referencias..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 px-3 py-2 border rounded-md text-sm bg-white dark:bg-zinc-800"
+                className="flex-1 px-3 py-2 border border-border rounded-md text-sm bg-input text-foreground"
               />
               <Button onClick={handleAddCitation} size="sm">
                 <PlusCircle className="h-4 w-4 mr-2" />
@@ -454,7 +454,7 @@ export function BibliographyEditor({ bibContent, onSave }: BibliographyEditorPro
             <ScrollArea className="flex-1 -mx-2 px-2">
               <div className="space-y-3 pb-4">
                 {filteredCitations.length === 0 ? (
-                  <div className="text-center py-8 text-zinc-500">
+                  <div className="text-center py-8 text-muted-foreground">
                     <p className="text-sm">Nenhuma referencia encontrada</p>
                     <Button
                       variant="outline"
@@ -487,11 +487,11 @@ export function BibliographyEditor({ bibContent, onSave }: BibliographyEditorPro
               </div>
             </ScrollArea>
 
-            <div className="mt-4 text-xs text-zinc-500 flex-shrink-0 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
+            <div className="mt-4 text-xs text-muted-foreground flex-shrink-0 bg-muted p-3 rounded-md">
               <p className="font-medium mb-1">Como citar no texto:</p>
               <p>
-                Use <code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">[@chave]</code> para inserir
-                uma citacao. Ex: <code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">[@{filteredCitations[0]?.key || "silva2023"}]</code>
+                Use <code className="bg-secondary px-1 rounded">[@chave]</code> para inserir
+                uma citacao. Ex: <code className="bg-secondary px-1 rounded">[@{filteredCitations[0]?.key || "silva2023"}]</code>
               </p>
             </div>
           </TabsContent>
@@ -500,18 +500,18 @@ export function BibliographyEditor({ bibContent, onSave }: BibliographyEditorPro
             <textarea
               value={rawContent}
               onChange={(e) => setRawContent(e.target.value)}
-              className="flex-1 font-mono text-xs p-4 border rounded-md resize-none bg-zinc-900 text-zinc-100"
+              className="flex-1 font-mono text-xs p-4 border border-border rounded-md resize-none bg-background text-foreground"
               placeholder="Cole seu arquivo .bib aqui..."
               spellCheck={false}
             />
-            <p className="mt-2 text-xs text-zinc-500 flex-shrink-0">
+            <p className="mt-2 text-xs text-muted-foreground flex-shrink-0">
               Edite diretamente o codigo BibTeX se preferir
             </p>
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-between items-center px-6 py-4 flex-shrink-0 border-t bg-zinc-50 dark:bg-zinc-900">
-          <span className="text-sm text-zinc-500">
+        <div className="flex justify-between items-center px-6 py-4 flex-shrink-0 border-t border-border bg-muted">
+          <span className="text-sm text-muted-foreground">
             {citations.length} referencias
           </span>
           <div className="flex gap-2">
@@ -566,7 +566,7 @@ export function CitationPicker({ citations, onInsert }: CitationPickerProps) {
           placeholder="Buscar por autor, titulo ou chave..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-3 py-2 border rounded-md text-sm mb-4 bg-white dark:bg-zinc-800"
+          className="w-full px-3 py-2 border border-border rounded-md text-sm mb-4 bg-input text-foreground"
           autoFocus
         />
 
@@ -575,18 +575,18 @@ export function CitationPicker({ citations, onInsert }: CitationPickerProps) {
             {filteredCitations.map((citation) => (
               <div
                 key={citation.key}
-                className="p-3 border rounded-md cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                className="p-3 border border-border rounded-md cursor-pointer hover:bg-accent transition-colors"
                 onClick={() => handleSelect(citation.key)}
               >
-                <p className="font-mono text-xs text-blue-600 dark:text-blue-400 mb-1">
+                <p className="font-mono text-xs text-primary mb-1">
                   [@{citation.key}]
                 </p>
-                <p className="text-sm font-medium line-clamp-2">{citation.title}</p>
-                <p className="text-xs text-zinc-500">{formatCitation(citation)}</p>
+                <p className="text-sm font-medium line-clamp-2 text-foreground">{citation.title}</p>
+                <p className="text-xs text-muted-foreground">{formatCitation(citation)}</p>
               </div>
             ))}
             {filteredCitations.length === 0 && (
-              <p className="text-sm text-zinc-500 text-center py-4">
+              <p className="text-sm text-muted-foreground text-center py-4">
                 Nenhuma citacao encontrada
               </p>
             )}

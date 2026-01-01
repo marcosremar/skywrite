@@ -30,12 +30,12 @@ export default async function DashboardLayout({
     .slice(0, 2) || "U";
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm dark:bg-zinc-950/80">
+      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-6">
-            <Link href="/projects" className="text-xl font-bold">
+            <Link href="/projects" className="text-xl font-bold text-primary">
               Thesis Writer
             </Link>
             <nav className="hidden md:flex items-center gap-4">
@@ -68,7 +68,7 @@ export default async function DashboardLayout({
                     <p className="font-medium">{session.user.name}</p>
                   )}
                   {session.user.email && (
-                    <p className="text-xs text-zinc-500">{session.user.email}</p>
+                    <p className="text-xs text-muted-foreground">{session.user.email}</p>
                   )}
                 </div>
               </div>

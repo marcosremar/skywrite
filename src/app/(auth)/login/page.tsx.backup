@@ -17,8 +17,8 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("demo@thesis.writer");
-  const [password, setPassword] = useState("demo123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -47,10 +47,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-foreground">Bem-vindo de volta</CardTitle>
+          <CardTitle className="text-2xl">Bem-vindo de volta</CardTitle>
           <CardDescription>
             Entre na sua conta para continuar
           </CardDescription>
@@ -73,7 +73,7 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="•••••••••"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -81,20 +81,8 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-sm text-red-500">{error}</p>
             )}
-
-            <div className="bg-accent/20 p-3 rounded-lg mb-4">
-              <p className="text-xs text-primary mb-2">
-                <strong>📝 Demo Credentials:</strong>
-              </p>
-              <p className="text-xs text-muted-foreground mb-1">
-                Email: <code className="bg-muted px-2 py-1 rounded">demo@thesis.writer</code>
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Senha: <code className="bg-muted px-2 py-1 rounded">demo123</code>
-              </p>
-            </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Entrando..." : "Entrar"}
@@ -103,10 +91,10 @@ export default function LoginPage() {
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
+              <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">
+              <span className="bg-white px-2 text-zinc-500 dark:bg-zinc-950">
                 Ou continue com
               </span>
             </div>
@@ -127,8 +115,8 @@ export default function LoginPage() {
             </Button>
           </div>
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            Não tem uma conta?{" "}
+          <p className="mt-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
+            Nao tem uma conta?{" "}
             <Link href="/register" className="font-medium text-primary hover:underline">
               Criar conta
             </Link>
@@ -138,4 +126,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

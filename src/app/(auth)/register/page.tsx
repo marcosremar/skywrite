@@ -59,10 +59,10 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+    <div className="flex min-h-screen items-center justify-center bg-background">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Criar conta</CardTitle>
+          <CardTitle className="text-2xl text-foreground">Criar conta</CardTitle>
           <CardDescription>
             Comece a escrever sua tese hoje
           </CardDescription>
@@ -105,7 +105,7 @@ export default function RegisterPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-red-500">{error}</p>
+              <p className="text-sm text-destructive">{error}</p>
             )}
 
             <Button type="submit" className="w-full" disabled={loading}>
@@ -115,10 +115,10 @@ export default function RegisterPage() {
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+              <span className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-zinc-500 dark:bg-zinc-950">
+              <span className="bg-card px-2 text-muted-foreground">
                 Ou continue com
               </span>
             </div>
@@ -139,7 +139,7 @@ export default function RegisterPage() {
             </Button>
           </div>
 
-          <p className="mt-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-6 text-center text-sm text-muted-foreground">
             Ja tem uma conta?{" "}
             <Link href="/login" className="font-medium text-primary hover:underline">
               Entrar
