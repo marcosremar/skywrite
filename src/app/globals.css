@@ -1,87 +1,167 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root {
+@theme {
   --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 
-  /* Typography - using system fonts for reliability */
-  --font-display: Georgia, "Times New Roman", serif;
-  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Typography - Modern readable fonts */
+  --font-display: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Merriweather", Georgia, "Times New Roman", serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono", monospace;
 
-  /* Academic Studio Dark Theme */
-  /* Deep blue-gray backgrounds for focus */
-  --background: #161a1f;
-  --foreground: #ebedef;
+  /* Refined Dark Theme - Simplified 2-level elevation system */
+  --color-background: #0f1114;
+  --color-foreground: #e8eaed;
 
-  /* Layered surfaces */
-  --card: #1e2328;
-  --card-foreground: #ebedef;
-  --popover: #242a30;
-  --popover-foreground: #ebedef;
+  --color-card: #181b20;
+  --color-card-foreground: #e8eaed;
+  --color-popover: #1c2026;
+  --color-popover-foreground: #e8eaed;
 
-  /* Primary: Teal - calm, focused, professional */
-  --primary: #2dd4bf;
-  --primary-foreground: #0f2926;
+  /* Softer teal - less aggressive than neon green */
+  --color-primary: #5eead4;
+  --color-primary-foreground: #0a1f1c;
 
-  /* Secondary: Soft slate */
-  --secondary: #2a3038;
-  --secondary-foreground: #d1d5db;
+  --color-secondary: #1e2228;
+  --color-secondary-foreground: #c4c8cc;
 
-  /* Muted: Understated */
-  --muted: #252b32;
-  --muted-foreground: #8b929a;
+  --color-muted: #1a1d22;
+  --color-muted-foreground: #7a8086;
 
-  /* Accent: Warm amber for highlights and success */
-  --accent: #2f3640;
-  --accent-foreground: #ebedef;
+  --color-accent: #232830;
+  --color-accent-foreground: #e8eaed;
 
-  /* Semantic colors */
-  --success: #34d399;
-  --success-foreground: #052e1b;
-  --warning: #fbbf24;
-  --warning-foreground: #422006;
-  --destructive: #ef4444;
+  /* Softer status colors - pastel/desaturated */
+  --color-success: #6ee7b7;
+  --color-success-foreground: #052e1b;
+  --color-warning: #fcd34d;
+  --color-warning-foreground: #422006;
+  --color-destructive: #f87171;
+  --color-destructive-foreground: #fef2f2;
 
-  /* AI Advisor: Distinctive purple-blue */
-  --advisor: #a78bfa;
-  --advisor-foreground: #faf5ff;
+  /* Softer advisor purple */
+  --color-advisor: #c4b5fd;
+  --color-advisor-foreground: #faf5ff;
 
-  /* Borders and inputs */
-  --border: #363d47;
-  --input: #252b32;
-  --ring: #2dd4bf;
+  /* Subtle borders - less visible */
+  --color-border: #262b33;
+  --color-input: #1a1d22;
+  --color-ring: #5eead4;
 
-  /* Charts */
-  --chart-1: #2dd4bf;
-  --chart-2: #34d399;
-  --chart-3: #fbbf24;
-  --chart-4: #a78bfa;
-  --chart-5: #f472b6;
+  --color-chart-1: #5eead4;
+  --color-chart-2: #6ee7b7;
+  --color-chart-3: #fcd34d;
+  --color-chart-4: #c4b5fd;
+  --color-chart-5: #f9a8d4;
 
-  /* Sidebar */
-  --sidebar: #12161a;
-  --sidebar-foreground: #d1d5db;
-  --sidebar-primary: #2dd4bf;
-  --sidebar-primary-foreground: #0f2926;
-  --sidebar-accent: #242a30;
-  --sidebar-accent-foreground: #ebedef;
-  --sidebar-border: #2a3038;
-  --sidebar-ring: #2dd4bf;
+  /* Sidebar - slightly darker for depth */
+  --color-sidebar: #0c0e11;
+  --color-sidebar-foreground: #c4c8cc;
+  --color-sidebar-primary: #5eead4;
+  --color-sidebar-primary-foreground: #0a1f1c;
+  --color-sidebar-accent: #181b20;
+  --color-sidebar-accent-foreground: #e8eaed;
+  --color-sidebar-border: #1e2228;
+  --color-sidebar-ring: #5eead4;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-body);
-  }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
-  }
+/* CSS variables for compatibility */
+:root {
+  --radius: 0.625rem;
+  --background: #0f1114;
+  --foreground: #e8eaed;
+  --card: #181b20;
+  --card-foreground: #e8eaed;
+  --popover: #1c2026;
+  --popover-foreground: #e8eaed;
+  --primary: #5eead4;
+  --primary-foreground: #0a1f1c;
+  --secondary: #1e2228;
+  --secondary-foreground: #c4c8cc;
+  --muted: #1a1d22;
+  --muted-foreground: #7a8086;
+  --accent: #232830;
+  --accent-foreground: #e8eaed;
+  --success: #6ee7b7;
+  --success-foreground: #052e1b;
+  --warning: #fcd34d;
+  --warning-foreground: #422006;
+  --destructive: #f87171;
+  --advisor: #c4b5fd;
+  --advisor-foreground: #faf5ff;
+  --border: #262b33;
+  --input: #1a1d22;
+  --ring: #5eead4;
+  --chart-1: #5eead4;
+  --chart-2: #6ee7b7;
+  --chart-3: #fcd34d;
+  --chart-4: #c4b5fd;
+  --chart-5: #f9a8d4;
+  --sidebar: #0c0e11;
+  --sidebar-foreground: #c4c8cc;
+  --sidebar-primary: #5eead4;
+  --sidebar-primary-foreground: #0a1f1c;
+  --sidebar-accent: #181b20;
+  --sidebar-accent-foreground: #e8eaed;
+  --sidebar-border: #1e2228;
+  --sidebar-ring: #5eead4;
+  --font-display: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Merriweather", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono", monospace;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* ============================================
+   EDITOR CONTENT STYLES
+   ============================================ */
+.editor-content {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  line-height: 1.75;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.editor-content h1,
+.editor-content h2,
+.editor-content h3 {
+  font-family: var(--font-display);
+  color: var(--foreground);
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.editor-content h1 {
+  font-size: 1.75rem;
+}
+
+.editor-content h2 {
+  font-size: 1.5rem;
+}
+
+.editor-content h3 {
+  font-size: 1.25rem;
 }
 
 /* ============================================
@@ -239,14 +319,67 @@
 .stagger-5 { animation-delay: 0.25s; }
 
 /* ============================================
-   AI ADVISOR STYLES
+   AI ADVISOR STYLES - Refined Dark Mode
    ============================================ */
 .advisor-panel {
   background: linear-gradient(
     180deg,
-    #1e2328 0%,
-    #191e23 100%
+    #16181c 0%,
+    #0f1114 100%
   );
+}
+
+/* Elevated card style with subtle border */
+.advisor-card {
+  background: #1a1e22;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.advisor-card:hover {
+  background: #1e2228;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Subtle separator */
+.advisor-separator {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+  margin: 1.25rem 0;
+}
+
+/* AI Advisor Panel Styles */
+.advisor-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: linear-gradient(to bottom, #16181c, #0f1114);
+  word-break: break-word; /* Ensure text wraps */
+}
+
+.advisor-panel * {
+  min-width: 0; /* Allow flex items to shrink below content size */
+}
+
+.advisor-panel img,
+.advisor-panel svg {
+  max-width: 100%;
+  flex-shrink: 0;
+}
+
+.advisor-panel [data-radix-scroll-area-viewport] {
+  width: 100%;
+}
+
+.advisor-panel [data-radix-scroll-area-content] {
+  min-width: 100%;
 }
 
 .advisor-message {
