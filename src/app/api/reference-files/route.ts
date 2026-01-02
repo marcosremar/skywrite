@@ -90,15 +90,31 @@ export async function POST(request: NextRequest) {
     const fileExtension = file.name.toLowerCase().split('.').pop();
 
     if (fileExtension === "pdf") {
-      // For PDF files, we can't extract text directly in Node.js without a library
-      // For now, store a placeholder and mark for manual processing
-      content = "[Arquivo PDF - extração de texto pendente]";
+      // Extract text from PDF using unpdf
+      try {
+        console.log("Extracting text from PDF...");
+        const { extractText } = await import("unpdf");
+        // Convert Buffer to Uint8Array
+        const uint8Array = new Uint8Array(buffer);
+        const result = await extractText(uint8Array);
+        console.log("PDF extraction result type:", typeof result, "keys:", Object.keys(result));
+        // Handle different result formats
+        const textContent = typeof result.text === 'string'
+          ? result.text
+          : Array.isArray(result.text)
+            ? result.text.join('\n')
+            : String(result.text || result);
+        content = textContent.replace(/\x00/g, "").trim();
+        console.log(`PDF text extracted: ${content.length} characters`);
+      } catch (pdfError) {
+        console.error("PDF extraction error:", pdfError);
+        content = "[Erro ao extrair texto do PDF]";
+      }
     } else if (fileExtension === "docx") {
-      // DOCX files are also binary (ZIP archives)
-      content = "[Arquivo DOCX - extração de texto pendente]";
+      // DOCX - placeholder for now
+      content = "[Arquivo DOCX - use PDF, TXT ou MD para análise automática]";
     } else {
       // For text files (.txt, .md), read as UTF-8
-      // Remove null bytes and other invalid characters
       content = buffer.toString("utf-8").replace(/\x00/g, "").trim();
     }
 
@@ -115,21 +131,30 @@ export async function POST(request: NextRequest) {
         mimeType: file.type || "text/plain",
         sizeBytes: file.size,
         storageKey,
-        status: fileExtension === "pdf" || fileExtension === "docx"
-          ? ProcessingStatus.PENDING
-          : ProcessingStatus.PROCESSING,
+        status: ProcessingStatus.PROCESSING,
         extractedText: content,
       },
     });
 
-    // Only process patterns for text files
-    const isBinaryFile = fileExtension === "pdf" || fileExtension === "docx";
+    // Process patterns for files with extracted content
+    const hasContent = content.length > 100 && !content.startsWith("[");
     let patterns: ExtractedPattern[] = [];
     const createdRules = [];
 
-    if (!isBinaryFile && content.length > 0) {
-      // Process the file and extract patterns
-      patterns = extractPatternsFromText(content);
+    if (hasContent) {
+      // Try LLM analysis first, fall back to regex if unavailable
+      try {
+        if (process.env.OPENROUTER_API_KEY) {
+          patterns = await analyzeWithLLM(content, file.name);
+          console.log(`LLM analysis extracted ${patterns.length} patterns`);
+        } else {
+          console.log("No OPENROUTER_API_KEY, using regex analysis");
+          patterns = extractPatternsFromText(content);
+        }
+      } catch (llmError) {
+        console.warn("LLM analysis failed, falling back to regex:", llmError instanceof Error ? llmError.message : llmError);
+        patterns = extractPatternsFromText(content);
+      }
 
       // Update with extracted patterns
       await db.referenceFile.update({
@@ -187,9 +212,9 @@ export async function POST(request: NextRequest) {
       {
         file: updatedFile,
         rulesCreated: createdRules.length,
-        message: isBinaryFile
-          ? "Arquivo enviado. Arquivos PDF/DOCX requerem processamento manual."
-          : `${createdRules.length} regras extraídas do arquivo.`,
+        message: hasContent
+          ? `${createdRules.length} regras de estilo extraídas do documento.`
+          : "Arquivo enviado, mas não foi possível extrair texto.",
       },
       { status: 201 }
     );
@@ -210,6 +235,155 @@ interface ExtractedPattern {
   pattern: string;
   category: string;
   section?: string;
+}
+
+// LLM-based style analysis using OpenRouter with Qwen3-235B
+async function analyzeWithLLM(text: string, fileName: string): Promise<ExtractedPattern[]> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  console.log("OpenRouter API key prefix:", apiKey?.slice(0, 20) + "...");
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY não configurada");
+  }
+
+  // Qwen3 supports larger context - use more text
+  const truncatedText = text.slice(0, 15000);
+
+  const systemPrompt = `Você é um especialista em metodologia científica e escrita acadêmica com 20 anos de experiência orientando teses e dissertações.
+
+Analise este documento de referência e extraia regras de estilo ESPECÍFICAS e CONTEXTUAIS que possam ser usadas para avaliar outros trabalhos acadêmicos.
+
+## O QUE EXTRAIR:
+
+### 1. ESTRUTURA ARGUMENTATIVA
+- Como o autor constrói argumentos (claim → evidence → warrant)
+- Padrões de transição entre parágrafos e seções
+- Organização lógica das ideias
+
+### 2. PADRÕES DE CITAÇÃO
+- Estilo usado (ABNT, APA, Vancouver, numérico)
+- Densidade de citações por parágrafo (ex: "a cada 2-3 frases há citação")
+- Padrões como "Segundo X (ano)", "De acordo com X", etc.
+
+### 3. VOCABULÁRIO E TOM
+- Registro formal/acadêmico específico da área
+- Conectivos usados (porém, entretanto, dessa forma, etc.)
+- Expressões típicas de cada seção
+- Uso de voz passiva vs ativa
+
+### 4. ELEMENTOS OBRIGATÓRIOS POR SEÇÃO
+- O que a introdução DEVE conter
+- Elementos essenciais da metodologia
+- Estrutura esperada da discussão
+
+### 5. PADRÕES DE QUALIDADE
+- Proporção de citações recentes (últimos 5 anos)
+- Extensão típica de cada seção
+- Profundidade de análise
+
+## REGRAS PARA OS PATTERNS:
+
+IMPORTANTE: Os patterns devem ser CONTEXTUAIS, não apenas keywords soltas.
+
+❌ RUIM: "objetivo"
+✅ BOM: "(este|o presente)\\s+(estudo|trabalho|pesquisa)\\s+(tem como|possui|apresenta)\\s+objetivo"
+
+❌ RUIM: "metodologia"
+✅ BOM: "(optou-se|escolheu-se|adotou-se)\\s+(pela|por)\\s+(abordagem|metodologia|método)"
+
+❌ RUIM: "resultado"
+✅ BOM: "(os|estes)\\s+(resultados|dados|achados)\\s+(mostram|indicam|revelam|sugerem)"
+
+## FORMATO DE RESPOSTA:
+
+Retorne APENAS um JSON válido:
+{
+  "rules": [
+    {
+      "name": "Nome descritivo da regra",
+      "description": "O que esta regra verifica e por que é importante",
+      "pattern": "regex contextual com \\\\s+ para espaços",
+      "category": "STRUCTURE|CONTENT|CITATION|STYLE",
+      "section": "introduction|methodology|results|discussion|conclusion|null",
+      "severity": "ERROR|WARNING|INFO",
+      "example": "Exemplo de texto que satisfaz esta regra"
+    }
+  ],
+  "documentProfile": {
+    "area": "área do conhecimento detectada",
+    "citationStyle": "ABNT|APA|Vancouver|outro",
+    "avgCitationsPerPage": número,
+    "recentCitationsPercent": número,
+    "writingTone": "formal|semiformal|técnico"
+  }
+}
+
+Extraia entre 10-20 regras de alta qualidade. Prefira qualidade a quantidade.`;
+
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": process.env.NEXTAUTH_URL || "http://localhost:3000",
+      "X-Title": "SkyWrite - Thesis Writing Platform",
+    },
+    body: JSON.stringify({
+      model: "qwen/qwen3-235b-a22b:free", // Qwen3 235B - muito mais capaz
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Analise este documento acadêmico de referência e extraia regras de estilo contextuais:\n\n---\n${truncatedText}\n---\n\nRetorne APENAS o JSON, sem explicações adicionais.` },
+      ],
+      max_tokens: 4096,
+      temperature: 0.2, // Mais determinístico para consistência
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("OpenRouter error:", error);
+    throw new Error(`OpenRouter API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  let responseText = data.choices?.[0]?.message?.content || "";
+
+  // Qwen3 pode incluir tags de thinking - remover
+  responseText = responseText.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+  // Parse JSON from response
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    console.error("LLM response without JSON:", responseText);
+    throw new Error("No JSON found in LLM response");
+  }
+
+  let analysisResult;
+  try {
+    analysisResult = JSON.parse(jsonMatch[0]);
+  } catch (parseError) {
+    console.error("JSON parse error:", parseError, "Raw:", jsonMatch[0]);
+    throw new Error("Failed to parse LLM response as JSON");
+  }
+
+  // Log document profile for debugging
+  if (analysisResult.documentProfile) {
+    console.log("Document profile:", analysisResult.documentProfile);
+  }
+
+  // Validate and return patterns with enhanced data
+  return (analysisResult.rules || [])
+    .filter((r: any) => r.name && r.pattern)
+    .map((r: any) => ({
+      name: String(r.name).slice(0, 100),
+      description: String(r.description || r.name).slice(0, 500) +
+        (r.example ? `\n\nExemplo: "${r.example}"` : ""),
+      pattern: String(r.pattern).slice(0, 300),
+      category: ["STRUCTURE", "CONTENT", "CITATION", "STYLE", "CUSTOM"].includes(r.category)
+        ? r.category
+        : "CUSTOM",
+      section: r.section || undefined,
+      severity: r.severity || "INFO",
+    }));
 }
 
 function extractPatternsFromText(text: string): ExtractedPattern[] {

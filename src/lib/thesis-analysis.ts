@@ -443,40 +443,239 @@ export function createSectionChecklist(
   };
 }
 
-// Specific suggestions for each missing item
-const ITEM_SUGGESTIONS: Record<string, string> = {
-  // Introduction
-  "intro-problem": "Defina claramente o problema de pesquisa. Ex: 'O problema central desta pesquisa é...' ou 'A problemática que motiva este estudo refere-se a...'",
-  "intro-question": "Formule uma pergunta de pesquisa explícita. Ex: 'Qual o impacto de X em Y?' ou 'Como Z influencia W?'",
-  "intro-objective-general": "Adicione o objetivo geral. Ex: 'Este estudo tem como objetivo analisar/investigar/compreender...'",
-  "intro-objectives-specific": "Liste 3-5 objetivos específicos usando verbos de ação: identificar, analisar, avaliar, comparar, propor.",
-  "intro-hypothesis": "Se aplicável, formule uma hipótese. Ex: 'Espera-se que X esteja relacionado a Y' ou 'Supõe-se que...'",
-  "intro-structure": "Descreva a organização do trabalho. Ex: 'Este trabalho está organizado em X capítulos. O primeiro apresenta...'",
+// Enhanced suggestions with concrete examples and templates
+const ITEM_SUGGESTIONS: Record<string, { short: string; detailed: string; template: string; verbs?: string[] }> = {
+  // ============================================
+  // INTRODUCTION
+  // ============================================
+  "intro-context": {
+    short: "Contextualize o tema de pesquisa",
+    detailed: "Inicie apresentando o cenário atual do tema. Mostre a evolução histórica ou a situação contemporânea que justifica a relevância do estudo.",
+    template: "Nas últimas décadas, [fenômeno] tem se tornado cada vez mais [relevante/presente/discutido] no contexto de [área/campo]. Historicamente, [breve evolução]. Atualmente, [situação presente que demanda atenção].",
+  },
+  "intro-relevance": {
+    short: "Justifique a relevância do estudo",
+    detailed: "Explique POR QUE este estudo é importante. Quem se beneficia? Que problema social/científico/prático ele ajuda a resolver?",
+    template: "A relevância deste estudo justifica-se por [razão principal]. Do ponto de vista [teórico/prático/social], esta pesquisa contribui para [contribuição]. Além disso, [beneficiários] podem se beneficiar ao [benefício específico].",
+  },
+  "intro-problem": {
+    short: "Defina o problema de pesquisa",
+    detailed: "O problema deve ser uma lacuna, contradição ou necessidade identificada. Não é apenas um tema, mas uma questão que PRECISA ser investigada.",
+    template: "O problema central desta pesquisa reside em [lacuna/contradição/necessidade]. Apesar de [o que já se sabe], ainda não está claro [o que falta saber]. Esta lacuna é problemática porque [consequência de não resolver].",
+  },
+  "intro-question": {
+    short: "Formule a pergunta de pesquisa",
+    detailed: "A pergunta deve ser específica, investigável e alinhada ao problema. Deve começar com palavras interrogativas como 'Como', 'Qual', 'De que forma', 'Em que medida'.",
+    template: "Diante do exposto, a pergunta que norteia esta pesquisa é: [Como/Qual/De que forma] [objeto de estudo] [verbo de ação] [contexto/condições]?",
+    verbs: ["influencia", "afeta", "se relaciona com", "contribui para", "impacta"],
+  },
+  "intro-objective-general": {
+    short: "Declare o objetivo geral",
+    detailed: "O objetivo geral deve responder à pergunta de pesquisa. Use UM verbo no infinitivo que indique a amplitude do estudo. Deve ser alcançável e mensurável.",
+    template: "O presente estudo tem como objetivo geral [verbo no infinitivo] [objeto de estudo] [contexto/delimitação], visando [resultado esperado].",
+    verbs: ["analisar", "investigar", "compreender", "avaliar", "identificar", "verificar", "propor", "desenvolver"],
+  },
+  "intro-objectives-specific": {
+    short: "Liste os objetivos específicos",
+    detailed: "Os objetivos específicos são PASSOS para alcançar o objetivo geral. Devem ser 3-5 itens, em ordem lógica, cada um com um verbo diferente.",
+    template: "Para alcançar o objetivo geral, definem-se os seguintes objetivos específicos:\na) Identificar [primeiro aspecto];\nb) Analisar [segundo aspecto];\nc) Avaliar [terceiro aspecto];\nd) Propor [quarto aspecto, se aplicável].",
+    verbs: ["identificar", "descrever", "mapear", "categorizar", "comparar", "correlacionar", "mensurar", "propor"],
+  },
+  "intro-hypothesis": {
+    short: "Formule a hipótese (se aplicável)",
+    detailed: "A hipótese é uma resposta provisória à pergunta de pesquisa. Deve ser testável e falsificável. Em pesquisas qualitativas, pode ser substituída por pressupostos.",
+    template: "Como hipótese inicial, pressupõe-se que [variável independente] [relação: influencia/afeta/está relacionada a] [variável dependente], de modo que [direção da relação: positiva/negativa/específica].",
+  },
+  "intro-structure": {
+    short: "Descreva a estrutura do trabalho",
+    detailed: "Apresente brevemente o que cada capítulo/seção contém. Isso orienta o leitor sobre o que esperar.",
+    template: "Este trabalho está organizado em [N] capítulos. O primeiro capítulo apresenta [conteúdo]. O segundo capítulo aborda [conteúdo]. Na sequência, o terceiro capítulo descreve [conteúdo]. Por fim, o quarto capítulo [conteúdo].",
+  },
+  "intro-scope": {
+    short: "Delimite o escopo do estudo",
+    detailed: "Especifique os limites do estudo: temporal, geográfico, temático. O que NÃO será abordado e por quê.",
+    template: "Este estudo delimita-se a [escopo geográfico], no período de [escopo temporal], focando especificamente em [escopo temático]. Não serão abordados [exclusões] devido a [justificativa].",
+  },
 
-  // Literature Review
-  "lit-synthesis": "Conecte as ideias dos autores. Use: 'Enquanto X defende..., Y argumenta que...' ou 'Em consonância com X, Y também afirma...'",
-  "lit-comparison": "Compare explicitamente os autores. Ex: 'Diferente de X, Y propõe que...' ou 'Tanto X quanto Y concordam que...'",
-  "lit-gap": "Identifique lacunas na literatura. Ex: 'Poucos estudos investigaram...' ou 'Uma lacuna identificada é...'",
-  "lit-critical": "Apresente posicionamento crítico. Ex: 'Embora X argumente..., pode-se questionar...' ou 'Uma limitação do estudo de X é...'",
-  "lit-connection": "Conecte a literatura ao seu estudo. Ex: 'Para a presente pesquisa, é relevante o conceito de...'",
+  // ============================================
+  // LITERATURE REVIEW
+  // ============================================
+  "lit-organization": {
+    short: "Organize a revisão em subseções temáticas",
+    detailed: "Divida a revisão em tópicos lógicos. Cada subseção deve ter um tema central e conectar-se às demais.",
+    template: "## 2.1 [Primeiro conceito-chave]\n[Desenvolvimento do conceito com múltiplos autores]\n\n## 2.2 [Segundo conceito-chave]\n[Desenvolvimento e conexão com o anterior]",
+  },
+  "lit-synthesis": {
+    short: "Sintetize e conecte as ideias dos autores",
+    detailed: "Não apenas liste autores. DIALOGUE entre eles, mostrando convergências, divergências e complementaridades.",
+    template: "Enquanto [Autor A] (ano) defende que [posição A], [Autor B] (ano) argumenta que [posição B]. Essa aparente contradição pode ser compreendida considerando que [síntese]. Em consonância, [Autor C] (ano) acrescenta que [complemento].",
+  },
+  "lit-comparison": {
+    short: "Compare perspectivas de diferentes autores",
+    detailed: "Mostre explicitamente como os autores concordam ou discordam. Use conectivos de comparação.",
+    template: "Comparando as perspectivas, observa-se que tanto [Autor A] quanto [Autor B] concordam que [ponto comum]. Contudo, divergem quanto a [ponto de divergência]: enquanto o primeiro [posição A], o segundo [posição B].",
+  },
+  "lit-gap": {
+    short: "Identifique lacunas na literatura",
+    detailed: "Aponte O QUE ainda não foi estudado ou está subexplorado. Isso justifica SEU estudo.",
+    template: "Apesar dos avanços apresentados, observa-se uma lacuna na literatura quanto a [lacuna específica]. Poucos estudos investigaram [aspecto negligenciado], especialmente no contexto de [seu contexto]. Esta lacuna torna-se relevante porque [importância].",
+  },
+  "lit-critical": {
+    short: "Apresente posicionamento crítico",
+    detailed: "Não aceite tudo passivamente. Questione limitações metodológicas, generalizações indevidas ou contextos diferentes.",
+    template: "Embora [Autor] (ano) argumente que [argumento], pode-se questionar [aspecto questionável]. Isso porque [justificativa da crítica]. Uma limitação do estudo de [Autor] é [limitação], o que sugere cautela ao [aplicação].",
+  },
+  "lit-connection": {
+    short: "Conecte a literatura ao seu estudo",
+    detailed: "Ao final de cada subseção ou da revisão, mostre como aquele conhecimento se aplica à SUA pesquisa.",
+    template: "Para o presente estudo, os conceitos de [conceitos] são particularmente relevantes, pois permitem [aplicação]. A perspectiva de [Autor] será adotada como lente teórica para [propósito].",
+  },
+  "lit-recent": {
+    short: "Inclua referências recentes (últimos 5 anos)",
+    detailed: "Equilibre clássicos com publicações recentes. Mostre que você está atualizado com o estado da arte.",
+    template: "Estudos recentes, como os de [Autor] (2023) e [Autor] (2022), têm demonstrado que [achados recentes]. Isso representa um avanço em relação às perspectivas clássicas de [Autor] (ano anterior).",
+  },
 
-  // Methodology
-  "method-sample": "Descreva a amostra com números. Ex: 'Participaram 30 professores, selecionados por...' Inclua critérios de seleção.",
-  "method-analysis": "Especifique a técnica de análise. Ex: 'Os dados foram analisados por meio de análise de conteúdo temática' ou cite o software usado.",
-  "method-ethics": "Inclua informações éticas. Ex: 'Este estudo foi aprovado pelo Comitê de Ética (Parecer nº X)' ou 'Todos assinaram o TCLE.'",
-  "method-justification": "Justifique suas escolhas metodológicas. Ex: 'Optou-se pela abordagem qualitativa pois permite compreender em profundidade...'",
+  // ============================================
+  // METHODOLOGY
+  // ============================================
+  "method-type": {
+    short: "Defina o tipo de pesquisa",
+    detailed: "Especifique se é qualitativa, quantitativa ou mista. Se é exploratória, descritiva, explicativa ou aplicada.",
+    template: "Esta pesquisa caracteriza-se como [qualitativa/quantitativa/mista], de natureza [exploratória/descritiva/explicativa/aplicada]. A escolha por essa abordagem justifica-se por [justificativa], uma vez que [razão específica do seu estudo].",
+  },
+  "method-approach": {
+    short: "Especifique a abordagem metodológica",
+    detailed: "Indique o método específico: estudo de caso, etnografia, survey, experimento, pesquisa-ação, etc.",
+    template: "Adotou-se como estratégia metodológica o [estudo de caso/survey/experimento/etc.], conforme proposto por [Autor] (ano). Esta abordagem é apropriada porque [justificativa alinhada aos objetivos].",
+  },
+  "method-population": {
+    short: "Descreva a população do estudo",
+    detailed: "Especifique o universo do qual a amostra será extraída. Inclua características relevantes.",
+    template: "A população deste estudo compreende [descrição da população], totalizando aproximadamente [número] indivíduos/organizações/casos. Esta população foi escolhida por [critério de escolha].",
+  },
+  "method-sample": {
+    short: "Detalhe a amostra e critérios de seleção",
+    detailed: "Informe: tamanho da amostra, tipo de amostragem (probabilística/não-probabilística), critérios de inclusão e exclusão.",
+    template: "A amostra foi composta por [N] [participantes/casos/documentos], selecionados por meio de amostragem [tipo: intencional/aleatória/por conveniência/bola de neve].\n\nCritérios de inclusão: [lista]\nCritérios de exclusão: [lista]\n\nEste tamanho amostral justifica-se por [justificativa: saturação teórica/cálculo amostral/viabilidade].",
+  },
+  "method-instruments": {
+    short: "Descreva os instrumentos de coleta",
+    detailed: "Detalhe cada instrumento: questionário (quantas questões, escalas), roteiro de entrevista (tópicos), observação (protocolo).",
+    template: "Para a coleta de dados, utilizou-se [instrumento], composto por [descrição: N questões, tipos de questões, escalas utilizadas]. O instrumento foi [validado por/adaptado de] [fonte]. Um pré-teste foi realizado com [N] participantes para [propósito do pré-teste].",
+  },
+  "method-procedures": {
+    short: "Descreva os procedimentos de coleta",
+    detailed: "Explique COMO os dados foram coletados: período, local, duração, quem coletou, etapas seguidas.",
+    template: "A coleta de dados ocorreu entre [período], em [local]. Os procedimentos seguiram as seguintes etapas:\n1. [Primeira etapa e duração]\n2. [Segunda etapa e duração]\n3. [Terceira etapa e duração]\n\nCada [entrevista/aplicação] durou em média [tempo].",
+  },
+  "method-analysis": {
+    short: "Especifique a técnica de análise de dados",
+    detailed: "Indique O QUE foi feito com os dados: análise de conteúdo, estatística descritiva/inferencial, análise temática. Cite softwares.",
+    template: "Os dados foram analisados por meio de [técnica: análise de conteúdo temática/análise estatística descritiva e inferencial/análise do discurso], conforme proposto por [Autor] (ano). Utilizou-se o software [SPSS/NVivo/Atlas.ti/Excel] para [propósito]. As categorias de análise foram [pré-definidas/emergentes].",
+  },
+  "method-ethics": {
+    short: "Descreva os aspectos éticos",
+    detailed: "Inclua: aprovação do CEP (número do parecer), TCLE, garantia de anonimato, armazenamento de dados.",
+    template: "Este estudo foi aprovado pelo Comitê de Ética em Pesquisa da [instituição], sob parecer nº [número] (CAAE: [número]). Todos os participantes assinaram o Termo de Consentimento Livre e Esclarecido (TCLE). A confidencialidade foi garantida por meio de [medidas]. Os dados serão armazenados por [período] e descartados conforme [procedimento].",
+  },
+  "method-justification": {
+    short: "Justifique as escolhas metodológicas",
+    detailed: "Explique POR QUE cada escolha é adequada para responder sua pergunta de pesquisa.",
+    template: "A opção pela abordagem [abordagem] justifica-se por permitir [benefício alinhado ao objetivo]. A escolha de [método específico] é apropriada porque [razão]. Esta combinação metodológica possibilita [o que possibilita em relação aos objetivos].",
+  },
 
-  // Results
-  "results-visuals": "Inclua tabelas ou figuras para apresentar dados. Ex: 'A Tabela 1 apresenta...' ou 'Conforme ilustrado na Figura 2...'",
+  // ============================================
+  // RESULTS
+  // ============================================
+  "results-objective": {
+    short: "Apresente os resultados objetivamente",
+    detailed: "Descreva O QUE foi encontrado, sem interpretar ainda. Use verbos como 'observou-se', 'identificou-se', 'constatou-se'.",
+    template: "Os resultados indicam que [achado principal]. Observou-se que [achado específico 1]. Adicionalmente, constatou-se que [achado específico 2]. Esses dados são detalhados a seguir.",
+  },
+  "results-organization": {
+    short: "Organize por objetivos ou categorias",
+    detailed: "Estruture os resultados seguindo a ordem dos objetivos específicos ou por categorias temáticas emergentes.",
+    template: "## 4.1 [Primeiro objetivo específico ou categoria]\n[Resultados relacionados]\n\n## 4.2 [Segundo objetivo específico ou categoria]\n[Resultados relacionados]",
+  },
+  "results-visuals": {
+    short: "Inclua tabelas ou figuras",
+    detailed: "Use recursos visuais para sintetizar dados. Cada tabela/figura deve ser numerada, ter título e ser referenciada no texto.",
+    template: "A Tabela 1 apresenta [o que apresenta]. Observa-se que [destaque principal].\n\n| Variável | Categoria A | Categoria B |\n|----------|-------------|-------------|\n| X | valor | valor |\n\nFonte: Dados da pesquisa (ano).\n\nConforme ilustrado na Figura 1, [descrição do que a figura mostra].",
+  },
+  "results-description": {
+    short: "Descreva dados antes de apresentar tabelas",
+    detailed: "Não insira tabelas/figuras sem contexto. Apresente, descreva os principais achados e depois interprete na discussão.",
+    template: "Quanto a [aspecto analisado], os dados revelam que [tendência geral]. Conforme apresentado na Tabela X, [destaque específico]. Destaca-se que [dado mais relevante], representando [percentual ou proporção].",
+  },
 
-  // Discussion
-  "disc-literature": "Conecte resultados com a literatura. Ex: 'Esse achado corrobora os estudos de X [@autor2020], que também identificou...'",
-  "disc-limitations": "Reconheça limitações do estudo. Ex: 'Uma limitação deste estudo refere-se ao tamanho da amostra, que...'",
-  "disc-future": "Sugira pesquisas futuras. Ex: 'Estudos futuros poderiam investigar...' ou 'Recomenda-se aprofundar a análise de...'",
+  // ============================================
+  // DISCUSSION
+  // ============================================
+  "disc-interpretation": {
+    short: "Interprete o significado dos resultados",
+    detailed: "Vá além da descrição. O que os resultados SIGNIFICAM? Por que ocorreram? Quais as implicações?",
+    template: "Esses resultados sugerem que [interpretação]. Uma possível explicação para [achado] é [explicação]. Isso significa que [implicação], o que tem consequências para [área/prática/teoria].",
+  },
+  "disc-literature": {
+    short: "Dialogue com a literatura",
+    detailed: "Compare seus achados com estudos anteriores. Corroboram? Contradizem? Por quê?",
+    template: "Esses achados corroboram os estudos de [Autor] (ano), que também identificou [achado similar]. Contudo, diferem dos resultados de [Autor] (ano), que encontrou [achado diferente]. Essa divergência pode ser explicada por [possíveis razões: contexto, método, amostra].",
+  },
+  "disc-unexpected": {
+    short: "Discuta resultados inesperados",
+    detailed: "Se algo surpreendeu, discuta. Resultados inesperados frequentemente são os mais interessantes.",
+    template: "Um resultado inesperado foi [achado]. Contrariamente ao pressuposto inicial de que [hipótese], os dados indicaram [realidade]. Isso pode ser atribuído a [possíveis explicações] e merece investigação adicional.",
+  },
+  "disc-theoretical": {
+    short: "Discuta implicações teóricas",
+    detailed: "O que seu estudo acrescenta ao conhecimento? Confirma, refuta ou estende teorias existentes?",
+    template: "Do ponto de vista teórico, estes resultados contribuem para [área] ao [tipo de contribuição: confirmar/questionar/expandir] a perspectiva de [teoria/autor]. Especificamente, [contribuição específica].",
+  },
+  "disc-practical": {
+    short: "Discuta implicações práticas",
+    detailed: "Como os resultados podem ser aplicados? Quem pode usar e como?",
+    template: "Em termos práticos, estes resultados sugerem que [implicação para prática]. Profissionais de [área] podem [aplicação específica]. Recomenda-se que [recomendação acionável].",
+  },
+  "disc-limitations": {
+    short: "Reconheça as limitações do estudo",
+    detailed: "Seja honesto sobre as fraquezas. Isso demonstra maturidade científica e orienta leitores.",
+    template: "Este estudo apresenta algumas limitações que devem ser consideradas. Primeiramente, [limitação 1 e seu impacto]. Além disso, [limitação 2 e seu impacto]. Essas limitações sugerem cautela ao [generalização/aplicação] e apontam para [necessidade de estudos futuros].",
+  },
+  "disc-future": {
+    short: "Sugira pesquisas futuras",
+    detailed: "Indique caminhos para próximos estudos. O que ficou sem resposta? O que seria interessante investigar?",
+    template: "Estudos futuros poderiam investigar [lacuna identificada]. Seria relevante também [outra sugestão], especialmente considerando [justificativa]. Recomenda-se ainda [terceira sugestão] para [propósito].",
+  },
+  "disc-answer": {
+    short: "Responda à pergunta de pesquisa",
+    detailed: "Explicitamente conecte os resultados à pergunta inicial. O objetivo foi alcançado?",
+    template: "Retomando a pergunta de pesquisa — [pergunta] —, os resultados permitem afirmar que [resposta]. O objetivo geral de [objetivo] foi alcançado, demonstrando que [síntese dos achados principais].",
+  },
 
-  // Conclusion
-  "conc-answer": "Responda à pergunta de pesquisa. Ex: 'Conclui-se que...' ou 'Foi possível identificar que...'",
-  "conc-contributions": "Destaque as contribuições. Ex: 'A principal contribuição deste estudo é...' ou 'Este trabalho contribui para o campo ao...'",
+  // ============================================
+  // CONCLUSION
+  // ============================================
+  "conc-answer": {
+    short: "Responda à pergunta de pesquisa",
+    detailed: "Inicie a conclusão retomando o problema/pergunta e apresentando a resposta de forma clara e direta.",
+    template: "Este estudo buscou [objetivo/responder à pergunta]. Os resultados permitiram concluir que [resposta principal]. Verificou-se que [síntese dos principais achados], confirmando [ou não] a hipótese inicial.",
+  },
+  "conc-synthesis": {
+    short: "Sintetize os principais achados",
+    detailed: "Resuma os resultados mais importantes em poucas frases. Não repita detalhes, apenas o essencial.",
+    template: "Em síntese, os principais achados deste estudo foram: (1) [achado 1]; (2) [achado 2]; (3) [achado 3]. De modo geral, [conclusão integradora].",
+  },
+  "conc-contributions": {
+    short: "Destaque as contribuições",
+    detailed: "Explicite O QUE de novo este estudo traz para a área. Qual o valor agregado?",
+    template: "A principal contribuição deste estudo reside em [contribuição principal]. Para o campo de [área], este trabalho oferece [contribuição teórica]. Do ponto de vista prático, contribui ao [contribuição prática].",
+  },
+  "conc-recommendations": {
+    short: "Apresente recomendações",
+    detailed: "Sugira ações concretas para profissionais, gestores, formuladores de políticas.",
+    template: "Com base nos resultados, recomenda-se que [público-alvo 1] [ação recomendada 1]. Sugere-se ainda que [público-alvo 2] [ação recomendada 2]. Para [público-alvo 3], propõe-se [ação recomendada 3].",
+  },
 };
 
 /**
@@ -516,24 +715,43 @@ export function generateSectionFeedback(
     strengths.push(`${item.label} incluído (bom!)`);
   }
 
-  // Add weaknesses with specific suggestions
+  // Add weaknesses with specific suggestions (enhanced with templates)
   for (const item of missingRequired) {
     weaknesses.push(`${item.label} não identificado`);
-    const specificSuggestion = ITEM_SUGGESTIONS[item.id];
-    if (specificSuggestion) {
-      suggestions.push(specificSuggestion);
+    const suggestionData = ITEM_SUGGESTIONS[item.id];
+    if (suggestionData) {
+      // Build enhanced suggestion with template
+      let enhancedSuggestion = `**${suggestionData.short}**\n\n${suggestionData.detailed}`;
+
+      // Add template
+      enhancedSuggestion += `\n\n📝 **Modelo:**\n"${suggestionData.template}"`;
+
+      // Add recommended verbs if available
+      if (suggestionData.verbs && suggestionData.verbs.length > 0) {
+        enhancedSuggestion += `\n\n💡 **Verbos sugeridos:** ${suggestionData.verbs.join(", ")}`;
+      }
+
+      suggestions.push(enhancedSuggestion);
     } else {
       suggestions.push(`Adicione: ${item.description}`);
     }
   }
 
-  // Section-specific analysis with better feedback
+  // Section-specific analysis with enhanced feedback
   const wordCount = countWords(content);
 
   if (section === "introduction") {
     if (wordCount < 300) {
       weaknesses.push(`Introdução curta (${wordCount} palavras)`);
-      suggestions.push("Expanda a introdução para 500-800 palavras. Desenvolva melhor o contexto, justificativa e objetivos.");
+      suggestions.push(`**Expanda a introdução**
+
+A introdução atual tem ${wordCount} palavras, mas o recomendado é 500-800 palavras para uma tese/dissertação.
+
+📝 **Estrutura sugerida:**
+1. **Contextualização** (1-2 parágrafos): Apresente o cenário do tema
+2. **Problema e justificativa** (1-2 parágrafos): Por que este estudo?
+3. **Objetivos** (1 parágrafo): Geral e específicos
+4. **Estrutura do trabalho** (1 parágrafo): O que cada capítulo aborda`);
     } else if (wordCount >= 500) {
       strengths.push(`Extensão adequada (${wordCount} palavras)`);
     }
@@ -544,10 +762,26 @@ export function generateSectionFeedback(
 
     if (citations === 0) {
       weaknesses.push("Nenhuma citação encontrada");
-      suggestions.push("A revisão de literatura deve citar diversos autores. Use [@autor2024] ou (AUTOR, 2024) para incluir referências.");
+      suggestions.push(`**Adicione citações à revisão de literatura**
+
+A revisão de literatura DEVE referenciar outros autores. Sem citações, não há diálogo acadêmico.
+
+📝 **Formatos aceitos:**
+- Markdown: \`[@silva2023]\`
+- ABNT: \`(SILVA, 2023)\` ou \`Silva (2023)\`
+- APA: \`(Silva, 2023)\` ou \`Silva (2023)\`
+
+💡 **Dica:** Use "Segundo Silva (2023), ..." ou "De acordo com Silva (2023), ..." para integrar citações ao texto.`);
     } else if (citations < 5) {
       weaknesses.push(`Poucas citações (${citations} encontradas)`);
-      suggestions.push("Uma boa revisão deve ter pelo menos 10-15 citações. Amplie a discussão com mais autores relevantes da área.");
+      suggestions.push(`**Amplie as referências**
+
+Encontramos apenas ${citations} citações. Uma revisão robusta deve ter pelo menos 15-20 citações.
+
+📝 **Sugestões:**
+- Cada parágrafo deve ter ao menos 1 citação
+- Cite autores clássicos E recentes
+- Busque em bases como Google Scholar, Scopus, Web of Science`);
     } else if (citations >= 10) {
       strengths.push(`Boa quantidade de citações (${citations})`);
     }
@@ -555,24 +789,55 @@ export function generateSectionFeedback(
     const years = extractCitationYears(content);
     const currentYear = new Date().getFullYear();
     const recentYears = years.filter((y) => currentYear - y <= 5);
+    const recentPercent = years.length > 0 ? Math.round((recentYears.length / years.length) * 100) : 0;
 
     if (years.length > 0 && recentYears.length < years.length * 0.3) {
-      weaknesses.push("Muitas referências antigas");
-      suggestions.push(`Inclua mais publicações dos últimos 5 anos (${currentYear-5}-${currentYear}). Referências recentes mostram atualização do pesquisador.`);
+      weaknesses.push(`Referências desatualizadas (apenas ${recentPercent}% dos últimos 5 anos)`);
+      suggestions.push(`**Atualize as referências**
+
+Apenas ${recentPercent}% das suas citações são dos últimos 5 anos (${currentYear-5}-${currentYear}).
+
+📝 **Recomendação:**
+- Mínimo de 50% de referências recentes
+- Busque artigos de ${currentYear-3} a ${currentYear}
+- Mantenha clássicos, mas equilibre com atuais
+
+💡 **Por quê?** Referências recentes demonstram que você conhece o estado da arte e as discussões atuais do campo.`);
     } else if (recentYears.length >= years.length * 0.5) {
-      strengths.push("Bom equilíbrio entre referências clássicas e recentes");
+      strengths.push(`Referências atualizadas (${recentPercent}% dos últimos 5 anos)`);
     }
 
     if (wordCount < 500) {
       weaknesses.push(`Revisão muito curta (${wordCount} palavras)`);
-      suggestions.push("A revisão de literatura é uma das seções mais importantes. Desenvolva cada tópico com profundidade.");
+      suggestions.push(`**Desenvolva a revisão de literatura**
+
+Com ${wordCount} palavras, a revisão está superficial. Espera-se pelo menos 2000-3000 palavras.
+
+📝 **Como expandir:**
+- Aprofunde cada conceito-chave
+- Compare múltiplos autores sobre cada tema
+- Identifique lacunas e contradições
+- Conecte a literatura ao seu estudo`);
     }
   }
 
   if (section === "methodology") {
     if (wordCount < 300) {
       weaknesses.push(`Metodologia muito sucinta (${wordCount} palavras)`);
-      suggestions.push("Detalhe melhor cada aspecto metodológico: tipo de pesquisa, participantes, instrumentos, procedimentos e análise.");
+      suggestions.push(`**Detalhe a metodologia**
+
+A metodologia precisa ser replicável. Com ${wordCount} palavras, faltam detalhes essenciais.
+
+📝 **Elementos obrigatórios:**
+1. **Tipo/natureza da pesquisa**: qualitativa, quantitativa, mista
+2. **Estratégia metodológica**: estudo de caso, survey, experimento
+3. **Participantes/amostra**: quem, quantos, como selecionados
+4. **Instrumentos**: questionário, entrevista, observação
+5. **Procedimentos**: como os dados foram coletados
+6. **Análise**: técnica usada, software (se aplicável)
+7. **Aspectos éticos**: CEP, TCLE`);
+    } else if (wordCount >= 500) {
+      strengths.push(`Metodologia com extensão adequada (${wordCount} palavras)`);
     }
   }
 
@@ -580,23 +845,62 @@ export function generateSectionFeedback(
     const citations = countCitations(content);
     if (citations === 0) {
       weaknesses.push("Discussão sem diálogo com a literatura");
-      suggestions.push("Compare seus resultados com outros estudos. Ex: 'Esses achados corroboram X [@autor2020], que também identificou...'");
+      suggestions.push(`**Conecte os resultados com a literatura**
+
+A discussão deve COMPARAR seus achados com estudos anteriores, não apenas descrever.
+
+📝 **Estrutura sugerida:**
+"[Seu achado]. Esse resultado corrobora/contradiz os estudos de [Autor] (ano), que também identificou/encontrou diferente que [achado do autor]. Uma possível explicação para [convergência/divergência] é [explicação]."
+
+💡 **Conectivos úteis:**
+- Corrobora: "em consonância com", "confirma", "vai ao encontro de"
+- Contradiz: "diferente de", "em contrapartida", "diverge de"`);
     }
 
     if (wordCount < 300) {
       weaknesses.push(`Discussão curta (${wordCount} palavras)`);
-      suggestions.push("A discussão deve interpretar os resultados, não apenas repeti-los. Analise o significado dos achados.");
+      suggestions.push(`**Aprofunde a discussão**
+
+A discussão é onde você INTERPRETA os resultados. Não basta repetir dados.
+
+📝 **Perguntas a responder:**
+- O que os resultados SIGNIFICAM?
+- Por que ocorreram assim?
+- Como se comparam com outros estudos?
+- Quais as implicações teóricas e práticas?
+- Quais as limitações do estudo?
+- O que estudos futuros deveriam investigar?`);
+    } else if (wordCount >= 500) {
+      strengths.push(`Discussão com extensão adequada (${wordCount} palavras)`);
     }
   }
 
   if (section === "conclusion") {
     if (wordCount < 150) {
       weaknesses.push(`Conclusão muito breve (${wordCount} palavras)`);
-      suggestions.push("Sintetize os principais achados e destaque as contribuições do estudo.");
-    }
-    if (wordCount > 800) {
+      suggestions.push(`**Expanda a conclusão**
+
+A conclusão deve sintetizar o estudo. Com ${wordCount} palavras, faltam elementos importantes.
+
+📝 **Estrutura sugerida:**
+1. Retome a pergunta/objetivo de pesquisa
+2. Apresente a resposta/conclusão principal
+3. Sintetize os achados-chave (2-3 pontos)
+4. Destaque as contribuições do estudo
+5. Apresente recomendações práticas (se aplicável)`);
+    } else if (wordCount > 800) {
       weaknesses.push("Conclusão muito longa");
-      suggestions.push("A conclusão deve ser concisa. Evite introduzir novos argumentos ou dados nesta seção.");
+      suggestions.push(`**Reduza a conclusão**
+
+A conclusão deve ser concisa (300-500 palavras). Com ${wordCount} palavras, pode estar incluindo elementos que pertencem à discussão.
+
+📝 **O que NÃO incluir:**
+- Novos dados ou análises
+- Discussão extensa de resultados
+- Novas citações
+- Detalhes metodológicos`);
+    } else {
+      strengths.push(`Conclusão com extensão adequada (${wordCount} palavras)`);
     }
   }
 
@@ -860,8 +1164,30 @@ export function analyzeCitations(content: string): CitationAnalysis {
   };
 }
 
+// Section weights for score calculation (higher = more important)
+const SECTION_WEIGHTS: Record<SectionType, number> = {
+  title: 0.5,
+  abstract: 1.0,
+  introduction: 1.5,
+  'literature-review': 1.5,
+  methodology: 2.0,  // Methodology is crucial
+  results: 1.5,
+  discussion: 1.5,
+  conclusion: 1.0,
+  references: 0.5,
+};
+
+// Critical sections that must exist (penalties if missing)
+const CRITICAL_SECTIONS: SectionType[] = [
+  'introduction',
+  'methodology',
+  'results',
+  'conclusion',
+];
+
 /**
  * Performs a complete analysis of the thesis content
+ * Uses weighted scoring with penalties for missing critical sections
  */
 export function analyzeThesis(content: string): ThesisAnalysis {
   const sections = extractSections(content);
@@ -892,26 +1218,95 @@ export function analyzeThesis(content: string): ThesisAnalysis {
   // Analyze citations
   const citationAnalysis = analyzeCitations(content);
 
-  // Calculate overall score
-  const overallScore =
-    checklists.length > 0
-      ? Math.round(
-          checklists.reduce((sum, c) => sum + c.score, 0) / checklists.length
-        )
-      : 0;
+  // ============================================
+  // WEIGHTED SCORE CALCULATION WITH PENALTIES
+  // ============================================
 
-  // Generate summary
+  let weightedScore = 0;
+  let totalWeight = 0;
+  const presentSections = new Set(feedbacks.map(f => f.section));
+
+  // Calculate weighted average of present sections
+  for (const feedback of feedbacks) {
+    const weight = SECTION_WEIGHTS[feedback.section] || 1.0;
+    weightedScore += feedback.score * weight;
+    totalWeight += weight;
+  }
+
+  // Base score from weighted average
+  let overallScore = totalWeight > 0
+    ? Math.round(weightedScore / totalWeight)
+    : 0;
+
+  // PENALTIES for missing critical sections
+  const missingSections: string[] = [];
+  for (const criticalSection of CRITICAL_SECTIONS) {
+    if (!presentSections.has(criticalSection)) {
+      missingSections.push(SECTION_LABELS[criticalSection]);
+      // Each missing critical section reduces score by 15%
+      overallScore = Math.round(overallScore * 0.85);
+    }
+  }
+
+  // PENALTY for very low methodology score (it's the most important section)
+  const methodologyFeedback = feedbacks.find(f => f.section === 'methodology');
+  if (methodologyFeedback && methodologyFeedback.score < 30) {
+    // Methodology score under 30% = additional 20% penalty
+    overallScore = Math.round(overallScore * 0.80);
+  }
+
+  // PENALTY for poor citation coverage
+  if (citationAnalysis.score < 40) {
+    // Many uncited assertions = 10% penalty
+    overallScore = Math.round(overallScore * 0.90);
+  }
+
+  // BONUS for excellent sections (but cap at 100)
+  const excellentSections = feedbacks.filter(f => f.score >= 90);
+  if (excellentSections.length >= 3) {
+    overallScore = Math.min(100, Math.round(overallScore * 1.05));
+  }
+
+  // Ensure score is within bounds
+  overallScore = Math.max(0, Math.min(100, overallScore));
+
+  // ============================================
+  // GENERATE ENHANCED SUMMARY
+  // ============================================
+
   const strongPoints = feedbacks
     .filter((f) => f.score >= 70)
-    .map((f) => `${f.sectionLabel} bem estruturado`);
+    .map((f) => `${f.sectionLabel} bem estruturado (${f.score}%)`);
 
-  const improvementAreas = feedbacks
-    .filter((f) => f.score < 70)
-    .map((f) => `${f.sectionLabel} precisa de atencao`);
+  const improvementAreas: string[] = [];
 
-  // Add citation warning if there are uncited assertions
+  // Add missing sections as high priority
+  if (missingSections.length > 0) {
+    improvementAreas.push(`Seções faltando: ${missingSections.join(', ')}`);
+  }
+
+  // Add low-scoring sections
+  const lowScoringSections = feedbacks
+    .filter((f) => f.score < 50)
+    .sort((a, b) => a.score - b.score); // Worst first
+
+  for (const section of lowScoringSections.slice(0, 3)) {
+    improvementAreas.push(`${section.sectionLabel} precisa de atenção urgente (${section.score}%)`);
+  }
+
+  // Add medium-scoring sections
+  const mediumScoringSections = feedbacks
+    .filter((f) => f.score >= 50 && f.score < 70);
+
+  for (const section of mediumScoringSections.slice(0, 2)) {
+    improvementAreas.push(`${section.sectionLabel} pode ser melhorado (${section.score}%)`);
+  }
+
+  // Add citation warning with context
   if (citationAnalysis.uncitedAssertions.length > 0) {
-    improvementAreas.push(`${citationAnalysis.uncitedAssertions.length} afirmação(ões) sem citação`);
+    const count = citationAnalysis.uncitedAssertions.length;
+    const severity = count > 5 ? 'ALERTA: ' : '';
+    improvementAreas.push(`${severity}${count} afirmação(ões) sem citação adequada`);
   }
 
   return {

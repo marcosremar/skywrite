@@ -47,14 +47,17 @@ export interface CitationAnalysis {
   score: number; // 0-100
 }
 
-// Default system rules
+// Default system rules with CONTEXTUAL patterns (not just keywords)
 export const SYSTEM_RULES: Rule[] = [
-  // General rules (apply to any section)
+  // ============================================
+  // GENERAL RULES (apply to any section)
+  // ============================================
   {
     id: 'general-no-first-person',
     label: 'Evitar primeira pessoa',
     description: 'Texto academico geralmente usa terceira pessoa ou voz passiva',
-    pattern: '\\b(eu|meu|minha|meus|minhas|nos|nosso|nossa)\\b',
+    // Contextual: match first person pronouns at word boundaries
+    pattern: '\\b(eu\\s+(acredito|penso|considero|creio|acho)|minha\\s+opinião|na\\s+minha\\s+visão|meu\\s+ponto\\s+de\\s+vista)\\b',
     section: null,
     isSystemRule: true,
     isEnabled: false, // Disabled by default - some styles allow first person
@@ -63,18 +66,42 @@ export const SYSTEM_RULES: Rule[] = [
     id: 'general-has-citations',
     label: 'Possui citacoes',
     description: 'O texto deve conter referencias bibliograficas',
-    pattern: '\\[@|\\(\\w+,\\s*\\d{4}\\)',
+    // Multiple citation formats: [@...], (Author, year), (AUTHOR, year), Author (year)
+    pattern: '\\[@[\\w-]+\\]|\\([A-Z][a-zÀ-ú]+,?\\s*\\d{4}\\)|\\([A-Z]+,?\\s*\\d{4}\\)|[A-Z][a-zÀ-ú]+\\s*\\(\\d{4}\\)',
+    section: null,
+    isSystemRule: true,
+    isEnabled: true,
+  },
+  {
+    id: 'general-academic-tone',
+    label: 'Tom academico adequado',
+    description: 'Evita linguagem informal, superlativos exagerados e expressoes coloquiais',
+    // Detect informal language (negative rule - should NOT match)
+    pattern: '\\b(muito\\s+(legal|bom|ruim|interessante)|super\\s+\\w+|tipo\\s+assim|meio\\s+que|na\\s+real|pra\\s+(mim|você)|etc\\.?\\s*$|coisa|negócio|daí)\\b',
+    section: null,
+    isSystemRule: true,
+    isEnabled: true,
+  },
+  {
+    id: 'general-has-connectives',
+    label: 'Uso de conectivos logicos',
+    description: 'Paragrafos conectados com transicoes logicas',
+    // Contextual: connectives at start of sentences
+    pattern: '(^|\\.)\\s*(Nesse\\s+sentido|Dessa\\s+forma|Assim|Portanto|Contudo|Entretanto|Além\\s+disso|Por\\s+outro\\s+lado|Em\\s+contrapartida|Ademais|Desse\\s+modo|Por\\s+conseguinte)',
     section: null,
     isSystemRule: true,
     isEnabled: true,
   },
 
-  // Introduction rules
+  // ============================================
+  // INTRODUCTION RULES
+  // ============================================
   {
     id: 'intro-has-relevance',
     label: 'Justificativa da pesquisa',
     description: 'Explica por que a pesquisa e importante',
-    pattern: 'importan|relevan|necessari|fundamental|essencial|justifica|contribui',
+    // Contextual: relevance in context of study/research
+    pattern: '(a\\s+)?relevan(cia|te)\\s+(d(a|o|este)|desta|deste|para)|justifica(-se|tiva)|importan(cia|te)\\s+(d(a|o|este)|desta|deste|para|de\\s+se)',
     section: 'introduction',
     isSystemRule: true,
     isEnabled: true,
@@ -82,8 +109,9 @@ export const SYSTEM_RULES: Rule[] = [
   {
     id: 'intro-has-objective',
     label: 'Objetivo definido',
-    description: 'Apresenta o objetivo do estudo',
-    pattern: 'objetivo|visa|pretende|busca|propoe|tem como finalidade',
+    description: 'Apresenta o objetivo do estudo de forma explicita',
+    // Contextual: explicit objective statement
+    pattern: '(este|o\\s+presente|nosso)\\s+(estudo|trabalho|pesquisa|artigo)\\s+(tem\\s+como|possui|apresenta\\s+como)?\\s*objetivo|objetivo\\s+(geral|principal|deste|desta|do\\s+presente)',
     section: 'introduction',
     isSystemRule: true,
     isEnabled: true,
@@ -92,18 +120,32 @@ export const SYSTEM_RULES: Rule[] = [
     id: 'intro-has-problem',
     label: 'Problema de pesquisa',
     description: 'Define o problema a ser investigado',
-    pattern: 'problema|questao|pergunta|investiga|lacuna',
+    // Contextual: problem statement
+    pattern: '(o\\s+)?problema\\s+(central|principal|de\\s+pesquisa|que\\s+norteia|a\\s+ser)|problemática|questão\\s+(central|norteadora|de\\s+pesquisa)',
+    section: 'introduction',
+    isSystemRule: true,
+    isEnabled: true,
+  },
+  {
+    id: 'intro-has-question',
+    label: 'Pergunta de pesquisa',
+    description: 'Apresenta pergunta de pesquisa explicita',
+    // Contextual: research question format
+    pattern: '(pergunta|questão)\\s+(de\\s+pesquisa|norteadora|central)|busca\\s+responder|:\\s*(como|qual|quais|de\\s+que\\s+(forma|maneira|modo)|em\\s+que\\s+medida)\\s+[^?]+\\?',
     section: 'introduction',
     isSystemRule: true,
     isEnabled: true,
   },
 
-  // Literature review rules
+  // ============================================
+  // LITERATURE REVIEW RULES
+  // ============================================
   {
     id: 'lit-has-comparison',
     label: 'Comparacao entre autores',
     description: 'Compara diferentes perspectivas teoricas',
-    pattern: 'enquanto|por outro lado|diferente|similar|corrobora|diverge|concorda|discorda',
+    // Contextual: author comparison
+    pattern: '(enquanto|ao\\s+passo\\s+que)\\s+[A-Z][a-z]+\\s+(\\(\\d{4}\\)|defende|argumenta|propõe)|por\\s+outro\\s+lado,?\\s+[A-Z][a-z]+|(diferente|diferentemente)\\s+de\\s+[A-Z][a-z]+|corrobora(ndo)?\\s+(com)?\\s*(os|as|o|a)?\\s*(estudos|pesquisas|achados|resultados)\\s+de',
     section: 'literature-review',
     isSystemRule: true,
     isEnabled: true,
@@ -112,18 +154,32 @@ export const SYSTEM_RULES: Rule[] = [
     id: 'lit-has-gap',
     label: 'Identifica lacunas',
     description: 'Aponta gaps na literatura',
-    pattern: 'lacuna|gap|poucos estudos|carencia|ainda nao|pouco explorad',
+    // Contextual: gap identification
+    pattern: '(uma\\s+)?lacuna\\s+(identificada|na\\s+literatura|existente)|poucos\\s+estudos\\s+(investigaram|abordaram|exploraram)|ainda\\s+(não|nao)\\s+(foi|foram)\\s+(investigad|explorad|estudad)|carência\\s+de\\s+(estudos|pesquisas)',
+    section: 'literature-review',
+    isSystemRule: true,
+    isEnabled: true,
+  },
+  {
+    id: 'lit-has-synthesis',
+    label: 'Sintese entre autores',
+    description: 'Sintetiza e conecta ideias de diferentes autores',
+    // Contextual: synthesis phrases
+    pattern: 'em\\s+(consonância|sintonia)\\s+com\\s+[A-Z][a-z]+|[A-Z][a-z]+\\s+(e|,)\\s+[A-Z][a-z]+\\s+(concordam|convergem|apontam)|de\\s+modo\\s+semelhante,?\\s+[A-Z][a-z]+',
     section: 'literature-review',
     isSystemRule: true,
     isEnabled: true,
   },
 
-  // Methodology rules
+  // ============================================
+  // METHODOLOGY RULES
+  // ============================================
   {
     id: 'method-has-type',
     label: 'Tipo de pesquisa',
     description: 'Define a natureza da pesquisa',
-    pattern: 'qualitativ|quantitativ|mist|explorator|descritiv|experimental',
+    // Contextual: research type definition
+    pattern: '(pesquisa|estudo|abordagem)\\s+(qualitativ|quantitativ|mist)|caracteriza-se\\s+como\\s+(qualitativ|quantitativ)|natureza\\s+(qualitativ|quantitativ|exploratóri|descritiv)',
     section: 'methodology',
     isSystemRule: true,
     isEnabled: true,
@@ -131,8 +187,9 @@ export const SYSTEM_RULES: Rule[] = [
   {
     id: 'method-has-sample',
     label: 'Amostra descrita',
-    description: 'Descreve os participantes ou amostra',
-    pattern: 'participante|amostra|sujeito|respondente|entrevistad|\\d+\\s*(pessoa|aluno|professor)',
+    description: 'Descreve os participantes ou amostra com detalhes',
+    // Contextual: sample description with numbers or selection criteria
+    pattern: '(a\\s+)?amostra\\s+(foi\\s+composta|é\\s+composta|compõe-se)\\s+(por|de)|\\d+\\s*(participantes|respondentes|sujeitos|entrevistados|professores|alunos|empresas)|critérios\\s+de\\s+(inclusão|exclusão|seleção)',
     section: 'methodology',
     isSystemRule: true,
     isEnabled: true,
@@ -141,18 +198,32 @@ export const SYSTEM_RULES: Rule[] = [
     id: 'method-has-ethics',
     label: 'Aspectos eticos',
     description: 'Menciona aprovacao etica ou consentimento',
-    pattern: 'etica|cep|tcle|consentimento|comite|aprovad',
+    // Contextual: ethics approval
+    pattern: '(comitê|comite)\\s+de\\s+ética|CEP|TCLE|termo\\s+de\\s+consentimento|aprovado\\s+pelo\\s+(comitê|comite)|parecer\\s+(n[º°]?|número)\\s*[\\d\\.]+|CAAE',
+    section: 'methodology',
+    isSystemRule: true,
+    isEnabled: true,
+  },
+  {
+    id: 'method-has-analysis',
+    label: 'Tecnica de analise',
+    description: 'Especifica como os dados foram analisados',
+    // Contextual: analysis technique
+    pattern: '(os\\s+dados\\s+foram|dados\\s+serão)\\s+analisad|análise\\s+de\\s+(conteúdo|discurso|temática)|análise\\s+estatística|utilizou-se\\s+(o\\s+software|a\\s+técnica)|SPSS|NVivo|Atlas\\.?ti',
     section: 'methodology',
     isSystemRule: true,
     isEnabled: true,
   },
 
-  // Discussion rules
+  // ============================================
+  // DISCUSSION RULES
+  // ============================================
   {
     id: 'disc-connects-literature',
     label: 'Dialoga com literatura',
     description: 'Conecta resultados com estudos anteriores',
-    pattern: 'corrobora|confirma|vai ao encontro|segundo|de acordo com|conforme|\\[@',
+    // Contextual: connecting results with literature
+    pattern: '(ess(e|es|a|as)\\s+(resultado|achado|dado)s?)\\s+(corrobora|confirma|vai\\s+ao\\s+encontro|diverge|contradiz)|em\\s+(consonância|conformidade)\\s+com\\s+[A-Z][a-z]+|segundo\\s+[A-Z][a-z]+\\s+\\(\\d{4}\\)|de\\s+acordo\\s+com\\s+[A-Z][a-z]+',
     section: 'discussion',
     isSystemRule: true,
     isEnabled: true,
@@ -160,20 +231,98 @@ export const SYSTEM_RULES: Rule[] = [
   {
     id: 'disc-has-limitations',
     label: 'Reconhece limitacoes',
-    description: 'Menciona limitacoes do estudo',
-    pattern: 'limitac|limites do estudo|reconhece-se|ressalva',
+    description: 'Menciona limitacoes do estudo de forma explicita',
+    // Contextual: limitations acknowledgment
+    pattern: '(uma\\s+)?limitação\\s+(d(o|a|este|esta)|do\\s+presente)\\s+(estudo|pesquisa|trabalho)|limitações\\s+(d(o|a|este|esta)|do\\s+presente|metodológicas)|reconhece-se\\s+(como\\s+)?limitação|este\\s+estudo\\s+apresenta\\s+(algumas\\s+)?limitações',
+    section: 'discussion',
+    isSystemRule: true,
+    isEnabled: true,
+  },
+  {
+    id: 'disc-has-implications',
+    label: 'Implicacoes do estudo',
+    description: 'Discute implicacoes teoricas ou praticas',
+    // Contextual: implications
+    pattern: 'implicaç(ão|ões)\\s+(teórica|prática|para\\s+a\\s+prática)|do\\s+ponto\\s+de\\s+vista\\s+(teórico|prático)|contribui\\s+para\\s+(a\\s+teoria|a\\s+prática|o\\s+campo)',
+    section: 'discussion',
+    isSystemRule: true,
+    isEnabled: true,
+  },
+  {
+    id: 'disc-has-future',
+    label: 'Sugestoes de pesquisas futuras',
+    description: 'Sugere estudos futuros',
+    // Contextual: future research
+    pattern: '(estudos|pesquisas)\\s+futur(o|a)s\\s+(poderiam|deveriam|podem)|recomenda-se\\s+(que\\s+)?(futur|nov)|sugere-se\\s+(investigar|explorar|aprofundar)|trabalhos\\s+futuros\\s+(poderiam|podem)',
     section: 'discussion',
     isSystemRule: true,
     isEnabled: true,
   },
 
-  // Conclusion rules
+  // ============================================
+  // CONCLUSION RULES
+  // ============================================
   {
     id: 'conc-has-synthesis',
     label: 'Sintese dos resultados',
     description: 'Resume os principais achados',
-    pattern: 'conclui-se|foi possivel|os resultados|em sintese|em suma|portanto',
+    // Contextual: synthesis in conclusion
+    pattern: '(em\\s+síntese|em\\s+suma|de\\s+modo\\s+geral),?\\s+(os\\s+)?(principais\\s+)?(resultados|achados|conclusões)|conclui-se\\s+que|foi\\s+possível\\s+(identificar|verificar|constatar|compreender|analisar)',
     section: 'conclusion',
+    isSystemRule: true,
+    isEnabled: true,
+  },
+  {
+    id: 'conc-has-objective-answer',
+    label: 'Responde ao objetivo',
+    description: 'Conecta conclusoes ao objetivo da pesquisa',
+    // Contextual: answering the objective
+    pattern: 'o\\s+objetivo\\s+(geral\\s+)?(foi|está)\\s+(alcançado|atingido|cumprido)|respondendo\\s+(à|a)\\s+(pergunta|questão)\\s+de\\s+pesquisa|retomando\\s+o\\s+objetivo',
+    section: 'conclusion',
+    isSystemRule: true,
+    isEnabled: true,
+  },
+  {
+    id: 'conc-has-contributions',
+    label: 'Contribuicoes do estudo',
+    description: 'Destaca as contribuicoes da pesquisa',
+    // Contextual: study contributions
+    pattern: '(a\\s+)?(principal\\s+)?contribuição\\s+(d(o|a|este|esta)|do\\s+presente)\\s+(estudo|trabalho|pesquisa)|este\\s+(estudo|trabalho)\\s+contribui\\s+(para|ao)',
+    section: 'conclusion',
+    isSystemRule: true,
+    isEnabled: true,
+  },
+
+  // ============================================
+  // ACADEMIC TONE DETECTION (negative rules)
+  // ============================================
+  {
+    id: 'tone-no-informal',
+    label: 'Evita linguagem informal',
+    description: 'Detecta expressoes informais que devem ser evitadas',
+    // Informal expressions that should NOT appear
+    pattern: '\\b(acho\\s+que|eu\\s+acho|pra\\s+mim|tipo\\s+assim|basicamente|enfim|né\\??|ok\\??|legal|daí|aí|bom\\s+demais|muito\\s+legal)\\b',
+    section: null,
+    isSystemRule: true,
+    isEnabled: true,
+  },
+  {
+    id: 'tone-no-exaggeration',
+    label: 'Evita exageros',
+    description: 'Detecta superlativos e afirmacoes absolutas',
+    // Exaggerations that should be moderated
+    pattern: '\\b(totalmente|completamente|absolutamente|extremamente|obviamente|claramente|sem\\s+dúvida|indubitavelmente|inegavelmente|o\\s+melhor|o\\s+pior|sempre|nunca|todo(s|a|as))\\b(?!\\s+(os|as|a|o)\\s+(participantes|respondentes|autores|estudos))',
+    section: null,
+    isSystemRule: true,
+    isEnabled: true,
+  },
+  {
+    id: 'tone-passive-voice',
+    label: 'Uso de voz passiva',
+    description: 'Verifica uso adequado de voz passiva em metodologia',
+    // Passive voice patterns common in methodology
+    pattern: '(foi|foram)\\s+(realizado|aplicado|coletado|analisado|utilizado|desenvolvido|elaborado|conduzido)|(realizou-se|aplicou-se|coletou-se|utilizou-se|desenvolveu-se)',
+    section: 'methodology',
     isSystemRule: true,
     isEnabled: true,
   },
