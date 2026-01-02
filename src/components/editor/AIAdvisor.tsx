@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useRules, useReferenceFiles } from "@/hooks/useRules";
+import { marked } from "marked";
+
+// Configure marked for security
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+});
 
 // Minimal Icons
 const Icons = {
@@ -74,7 +81,78 @@ const Icons = {
       <circle cx="12" cy="12" r="10" opacity="0.2" fill="currentColor" /><path d="m9 12 2 2 4-4" />
     </svg>
   ),
+  layers: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" /><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
+    </svg>
+  ),
+  type: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <polyline points="4 7 4 4 20 4 20 7" /><line x1="9" x2="15" y1="20" y2="20" /><line x1="12" x2="12" y1="4" y2="20" />
+    </svg>
+  ),
+  quote: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21c0 1 0 1 1 1z" />
+    </svg>
+  ),
+  pen: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="m12 19 7-7 3 3-7 7-3-3z" /><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+    </svg>
+  ),
+  shield: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+    </svg>
+  ),
+  user: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+  link: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  ),
 };
+
+// Markdown Content Component
+function MarkdownContent({ content, className }: { content: string; className?: string }) {
+  const html = useMemo(() => {
+    try {
+      return marked.parse(content) as string;
+    } catch {
+      return content;
+    }
+  }, [content]);
+
+  return (
+    <div
+      className={cn(
+        "markdown-content max-w-none leading-relaxed",
+        "[&_p]:my-1.5 [&_p]:leading-relaxed",
+        "[&_ul]:my-1.5 [&_ul]:pl-4 [&_ul]:list-disc",
+        "[&_ol]:my-1.5 [&_ol]:pl-4 [&_ol]:list-decimal",
+        "[&_li]:my-0.5 [&_li]:leading-relaxed",
+        "[&_h1]:text-base [&_h1]:font-semibold [&_h1]:my-2 [&_h1]:text-white/90",
+        "[&_h2]:text-sm [&_h2]:font-semibold [&_h2]:my-2 [&_h2]:text-white/90",
+        "[&_h3]:text-sm [&_h3]:font-medium [&_h3]:my-1.5 [&_h3]:text-white/85",
+        "[&_strong]:text-white/90 [&_strong]:font-semibold",
+        "[&_em]:italic [&_em]:text-white/70",
+        "[&_code]:text-violet-300 [&_code]:bg-violet-500/10 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[12px] [&_code]:font-mono",
+        "[&_pre]:bg-white/5 [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:my-2 [&_pre]:overflow-x-auto",
+        "[&_pre_code]:bg-transparent [&_pre_code]:p-0",
+        "[&_a]:text-violet-400 [&_a]:underline [&_a]:underline-offset-2 hover:[&_a]:text-violet-300",
+        "[&_blockquote]:border-l-2 [&_blockquote]:border-white/20 [&_blockquote]:pl-3 [&_blockquote]:my-2 [&_blockquote]:text-white/60 [&_blockquote]:italic",
+        "[&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        className
+      )}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
 
 import type {
   ThesisAnalysis,
@@ -109,6 +187,59 @@ const CATEGORY_LABELS: Record<string, string> = {
   citation: "Citações",
   style: "Estilo",
   methodology: "Metodologia",
+};
+
+// Rule category configuration
+const RULE_CATEGORY_CONFIG: Record<string, {
+  icon: React.ReactNode;
+  color: string;
+  bgColor: string;
+  label: string;
+}> = {
+  STRUCTURE: {
+    icon: <Icons.layers className="w-3.5 h-3.5" />,
+    color: "text-purple-300",
+    bgColor: "border border-purple-500/25",
+    label: "Estrutura",
+  },
+  CONTENT: {
+    icon: <Icons.type className="w-3.5 h-3.5" />,
+    color: "text-blue-300",
+    bgColor: "border border-blue-500/25",
+    label: "Conteúdo",
+  },
+  CITATION: {
+    icon: <Icons.quote className="w-3.5 h-3.5" />,
+    color: "text-amber-300",
+    bgColor: "border border-amber-500/25",
+    label: "Citação",
+  },
+  STYLE: {
+    icon: <Icons.pen className="w-3.5 h-3.5" />,
+    color: "text-emerald-300",
+    bgColor: "border border-emerald-500/25",
+    label: "Estilo",
+  },
+  CUSTOM: {
+    icon: <Icons.settings className="w-3.5 h-3.5" />,
+    color: "text-pink-300",
+    bgColor: "border border-pink-500/25",
+    label: "Personalizado",
+  },
+};
+
+// Rule severity configuration
+const SEVERITY_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
+  ERROR: { label: "Obrigatório", color: "text-red-300", bgColor: "border border-red-500/25" },
+  WARNING: { label: "Recomendado", color: "text-yellow-300", bgColor: "border border-yellow-500/25" },
+  INFO: { label: "Sugestão", color: "text-blue-300", bgColor: "border border-blue-500/25" },
+};
+
+// Rule source icons and labels
+const RULE_SOURCE_CONFIG: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
+  SYSTEM: { icon: <Icons.shield className="w-3 h-3" />, label: "Sistema", color: "text-violet-400" },
+  USER: { icon: <Icons.user className="w-3 h-3" />, label: "Personalizada", color: "text-emerald-400" },
+  REFERENCE: { icon: <Icons.link className="w-3 h-3" />, label: "De Referência", color: "text-blue-400" },
 };
 
 export function AIAdvisor({ content, fileName, className }: AIAdvisorProps) {
@@ -302,9 +433,10 @@ export function AIAdvisor({ content, fileName, className }: AIAdvisorProps) {
                             colors.border
                           )}
                         >
-                          <p className="text-[13px] text-white/80 leading-relaxed">
-                            {issue.text}
-                          </p>
+                          <MarkdownContent
+                            content={issue.text}
+                            className="text-[13px] text-white/80"
+                          />
                           {issue.section && (
                             <p className="text-[11px] text-white/40 mt-1.5">
                               {SECTION_LABELS[issue.section as SectionType] || issue.section}
@@ -500,7 +632,11 @@ function ChatPanel() {
                   : "bg-white/[0.06] text-white/75"
               )}
             >
-              {msg.content}
+              {msg.role === "assistant" ? (
+                <MarkdownContent content={msg.content} className="text-[13px]" />
+              ) : (
+                msg.content
+              )}
             </div>
           ))
         )}
@@ -533,12 +669,13 @@ function ChatPanel() {
   );
 }
 
-// Settings Panel Component
+// Settings Panel Component with detailed rule view
 function SettingsPanel({ onClose }: { onClose: () => void }) {
   const { rules, loading, toggleRule, deleteRule, refetch: refetchRules } = useRules();
   const { files, uploading, uploadFile, deleteFile, refetch: refetchFiles } = useReferenceFiles();
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string; type: "file" | "rule" } | null>(null);
+  const [activeTab, setActiveTab] = useState<"system" | "reference" | "user">("system");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const systemRules = rules.filter(r => r.type === "SYSTEM");
@@ -557,15 +694,27 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleDeleteFile = async () => {
+  const handleDelete = async () => {
     if (!deleteConfirm) return;
     try {
-      await deleteFile(deleteConfirm.id);
+      if (deleteConfirm.type === "file") {
+        await deleteFile(deleteConfirm.id);
+      } else {
+        await deleteRule(deleteConfirm.id);
+      }
       setDeleteConfirm(null);
     } catch (err) {
-      console.error("Failed to delete file:", err);
+      console.error("Failed to delete:", err);
     }
   };
+
+  const tabs = [
+    { id: "system" as const, label: "Sistema", icon: <Icons.shield />, count: systemRules.length },
+    { id: "reference" as const, label: "Referências", icon: <Icons.link />, count: referenceRules.length },
+    { id: "user" as const, label: "Minhas", icon: <Icons.user />, count: userRules.length },
+  ];
+
+  const currentRules = activeTab === "system" ? systemRules : activeTab === "reference" ? referenceRules : userRules;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -573,12 +722,12 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-[#16181c] border border-white/10 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col shadow-2xl">
+      <div className="relative bg-[#16181c] border border-white/10 rounded-2xl w-full max-w-xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
           <div className="flex items-center gap-3">
             <Icons.settings className="text-white/50" />
-            <h2 className="text-[16px] font-semibold text-white/90">Configurações</h2>
+            <h2 className="text-[16px] font-semibold text-white/90">Configurações do Orientador</h2>
           </div>
           <button
             onClick={onClose}
@@ -588,112 +737,242 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {/* Reference Files Section */}
-          <div>
-            <h3 className="text-[13px] font-medium text-white/70 mb-3">Arquivos de Referência</h3>
-            <p className="text-[12px] text-white/40 mb-3">
-              Envie artigos ou teses de exemplo para extrair regras de escrita automaticamente.
-            </p>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".txt,.md,.pdf,.docx"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-white/[0.04] border border-dashed border-white/[0.15] hover:border-white/[0.25] hover:bg-white/[0.06] transition-all text-[13px] text-white/60 disabled:opacity-50"
-            >
-              {uploading ? (
-                <Icons.spinner className="w-4 h-4 animate-spin" />
-              ) : (
-                <Icons.upload className="w-4 h-4" />
-              )}
-              <span>{uploading ? "Analisando..." : "Enviar Arquivo"}</span>
-            </button>
-
-            {/* Uploaded files list */}
-            {files.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {files.map(file => (
-                  <div
-                    key={file.id}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
-                  >
-                    <Icons.file className="w-4 h-4 text-white/40" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] text-white/70 truncate">{file.originalName}</p>
-                      <p className="text-[11px] text-white/40">
-                        {file._count?.rules ?? 0} regras extraídas
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setDeleteConfirm({ id: file.id, name: file.originalName })}
-                      className="p-1.5 rounded-lg text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                    >
-                      <Icons.trash />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* Tabs */}
+        <div className="px-5 pt-4">
+          <div className="flex gap-1 p-1 rounded-xl bg-white/[0.04]">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-[12px] font-medium rounded-lg transition-all",
+                  activeTab === tab.id
+                    ? "bg-white/[0.08] text-white"
+                    : "text-white/50 hover:text-white/70 hover:bg-white/[0.04]"
+                )}
+              >
+                <span className={activeTab === tab.id ? "text-white/80" : "text-white/40"}>{tab.icon}</span>
+                <span>{tab.label}</span>
+                <span className={cn(
+                  "px-1.5 py-0.5 rounded-md text-[10px]",
+                  activeTab === tab.id ? "bg-white/[0.10] text-white/80" : "bg-white/[0.04] text-white/40"
+                )}>{tab.count}</span>
+              </button>
+            ))}
           </div>
+        </div>
 
-          {/* Rules Section */}
-          <div>
-            <h3 className="text-[13px] font-medium text-white/70 mb-3">
-              Regras Ativas ({rules.filter(r => r.isEnabled).length}/{rules.length})
-            </h3>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Reference Files Upload (only on reference tab) */}
+          {activeTab === "reference" && (
+            <div className="space-y-3 pb-4 border-b border-white/[0.06]">
+              <p className="text-[12px] text-white/50">
+                Envie artigos de exemplo para extrair regras automaticamente
+              </p>
 
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <Icons.spinner className="w-6 h-6 text-white/40 animate-spin" />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.md,.pdf,.docx"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-white/[0.04] border border-dashed border-white/[0.15] hover:border-white/[0.25] hover:bg-white/[0.06] transition-all text-[13px] text-white/60 disabled:opacity-50"
+              >
+                {uploading ? (
+                  <Icons.spinner className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Icons.upload className="w-4 h-4" />
+                )}
+                <span>{uploading ? "Analisando com IA..." : "Enviar Arquivo (PDF, TXT, MD)"}</span>
+              </button>
+
+              {/* Uploaded files list */}
+              {files.length > 0 && (
+                <div className="space-y-2">
+                  {files.map(file => (
+                    <div
+                      key={file.id}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
+                    >
+                      <Icons.file className="w-4 h-4 text-blue-400" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-white/70 truncate">{file.originalName}</p>
+                        <p className="text-[11px] text-blue-400/70">
+                          {file._count?.rules ?? 0} regras extraídas
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setDeleteConfirm({ id: file.id, name: file.originalName, type: "file" })}
+                        className="p-1.5 rounded-lg text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      >
+                        <Icons.trash />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Rules List */}
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Icons.spinner className="w-6 h-6 text-white/40 animate-spin" />
+            </div>
+          ) : currentRules.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mx-auto mb-3">
+                {activeTab === "system" ? <Icons.shield className="w-5 h-5 text-white/30" /> :
+                 activeTab === "reference" ? <Icons.link className="w-5 h-5 text-white/30" /> :
+                 <Icons.user className="w-5 h-5 text-white/30" />}
               </div>
-            ) : (
-              <div className="space-y-2">
-                {/* System Rules */}
-                {systemRules.length > 0 && (
-                  <RuleGroup
-                    title="Sistema"
-                    rules={systemRules}
-                    expandedRule={expandedRule}
-                    setExpandedRule={setExpandedRule}
-                    toggleRule={toggleRule}
-                    deleteRule={deleteRule}
-                  />
-                )}
+              <p className="text-[13px] text-white/50">
+                {activeTab === "system" ? "Nenhuma regra do sistema" :
+                 activeTab === "reference" ? "Envie um arquivo para extrair regras" :
+                 "Nenhuma regra personalizada"}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {currentRules.map(rule => {
+                const isExpanded = expandedRule === rule.id;
+                const categoryConfig = RULE_CATEGORY_CONFIG[rule.category] || RULE_CATEGORY_CONFIG.CUSTOM;
+                const severityConfig = SEVERITY_CONFIG[rule.severity] || SEVERITY_CONFIG.INFO;
+                const sourceConfig = RULE_SOURCE_CONFIG[rule.type] || RULE_SOURCE_CONFIG.SYSTEM;
 
-                {/* Reference Rules */}
-                {referenceRules.length > 0 && (
-                  <RuleGroup
-                    title="De Referências"
-                    rules={referenceRules}
-                    expandedRule={expandedRule}
-                    setExpandedRule={setExpandedRule}
-                    toggleRule={toggleRule}
-                    deleteRule={deleteRule}
-                  />
-                )}
+                return (
+                  <div
+                    key={rule.id}
+                    className={cn(
+                      "rounded-xl overflow-hidden border transition-all",
+                      rule.isEnabled ? "border-white/[0.06] bg-white/[0.02]" : "border-white/[0.03] bg-transparent opacity-60"
+                    )}
+                  >
+                    {/* Rule Header */}
+                    <div
+                      className="flex items-start gap-3 p-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                      onClick={() => setExpandedRule(isExpanded ? null : rule.id)}
+                    >
+                      {/* Toggle */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleRule(rule.id); }}
+                        className={cn(
+                          "w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors",
+                          rule.isEnabled
+                            ? "bg-emerald-500/20 border border-emerald-500/40"
+                            : "border border-white/20 hover:border-white/40"
+                        )}
+                      >
+                        {rule.isEnabled && (
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-emerald-400">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </button>
 
-                {/* User Rules */}
-                {userRules.length > 0 && (
-                  <RuleGroup
-                    title="Personalizadas"
-                    rules={userRules}
-                    expandedRule={expandedRule}
-                    setExpandedRule={setExpandedRule}
-                    toggleRule={toggleRule}
-                    deleteRule={deleteRule}
-                  />
-                )}
-              </div>
-            )}
+                      {/* Category Icon */}
+                      <div className={cn("p-1.5 rounded-lg flex-shrink-0", categoryConfig.bgColor)}>
+                        <span className={categoryConfig.color}>{categoryConfig.icon}</span>
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[13px] text-white/85 font-medium truncate flex-1">{rule.name}</p>
+                          <Icons.chevronRight className={cn(
+                            "text-white/40 flex-shrink-0 w-3.5 h-3.5 transition-transform",
+                            isExpanded && "rotate-90"
+                          )} />
+                        </div>
+
+                        {/* Tags */}
+                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                          <span className={cn("text-[10px] px-1.5 py-0.5 rounded-md", categoryConfig.bgColor, categoryConfig.color)}>
+                            {categoryConfig.label}
+                          </span>
+                          <span className={cn("text-[10px] px-1.5 py-0.5 rounded-md", severityConfig.bgColor, severityConfig.color)}>
+                            {severityConfig.label}
+                          </span>
+                          {rule.section && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md border border-white/[0.08] text-white/50">
+                              {SECTION_LABELS[rule.section as SectionType] || rule.section}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Source file (for reference rules) */}
+                        {rule.referenceFile && (
+                          <div className="flex items-center gap-1.5 mt-2">
+                            <Icons.file className="w-3 h-3 text-blue-400/70" />
+                            <span className="text-[11px] text-blue-400/70 truncate">
+                              Extraída de: {rule.referenceFile.originalName || rule.referenceFile.name}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Expanded Details */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-0 space-y-3 border-t border-white/[0.06] mt-0">
+                        {/* Description */}
+                        {rule.description && (
+                          <div className="pt-3">
+                            <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">O que verifica</p>
+                            <p className="text-[12px] text-white/65 leading-relaxed">{rule.description}</p>
+                          </div>
+                        )}
+
+                        {/* Pattern */}
+                        {rule.pattern && (
+                          <div>
+                            <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Padrão de busca</p>
+                            <code className="text-[11px] text-emerald-400/90 font-mono bg-emerald-500/[0.08] border border-emerald-500/15 px-3 py-2 rounded-lg block break-all whitespace-pre-wrap">
+                              {rule.pattern}
+                            </code>
+                          </div>
+                        )}
+
+                        {/* Source */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="text-[10px] text-white/40">Origem:</span>
+                          <span className={cn("flex items-center gap-1 text-[11px]", sourceConfig.color)}>
+                            {sourceConfig.icon}
+                            {sourceConfig.label}
+                          </span>
+                        </div>
+
+                        {/* Actions (for non-system rules) */}
+                        {rule.type !== "SYSTEM" && (
+                          <div className="flex gap-2 pt-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: rule.id, name: rule.name, type: "rule" }); }}
+                              className="px-4 py-2 rounded-lg border border-red-500/25 hover:border-red-500/50 hover:bg-red-500/10 text-[11px] text-red-400/70 hover:text-red-400 transition-colors"
+                            >
+                              Excluir Regra
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 px-5 py-3 border-t border-white/[0.06] bg-white/[0.02]">
+          <div className="flex items-center justify-between text-[11px] text-white/40">
+            <span>{rules.filter(r => r.isEnabled).length} regras ativas de {rules.length}</span>
+            <span>{files.length} arquivos de referência</span>
           </div>
         </div>
       </div>
@@ -703,9 +982,13 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteConfirm(null)} />
           <div className="relative bg-[#1a1e22] border border-white/10 rounded-xl p-5 w-[320px]">
-            <h3 className="text-[15px] font-medium text-white/90 mb-2">Excluir arquivo?</h3>
+            <h3 className="text-[15px] font-medium text-white/90 mb-2">
+              Excluir {deleteConfirm.type === "file" ? "arquivo" : "regra"}?
+            </h3>
             <p className="text-[13px] text-white/50 mb-4 break-words">{deleteConfirm.name}</p>
-            <p className="text-[12px] text-white/30 mb-4">As regras extraídas também serão excluídas.</p>
+            {deleteConfirm.type === "file" && (
+              <p className="text-[12px] text-white/30 mb-4">As regras extraídas também serão excluídas.</p>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
@@ -714,78 +997,13 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
                 Cancelar
               </button>
               <button
-                onClick={handleDeleteFile}
+                onClick={handleDelete}
                 className="flex-1 px-4 py-2.5 text-[13px] text-white bg-red-500/80 hover:bg-red-500 rounded-lg transition-colors"
               >
                 Excluir
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Rule Group Component
-function RuleGroup({
-  title,
-  rules,
-  expandedRule,
-  setExpandedRule,
-  toggleRule,
-  deleteRule,
-}: {
-  title: string;
-  rules: any[];
-  expandedRule: string | null;
-  setExpandedRule: (id: string | null) => void;
-  toggleRule: (id: string) => void;
-  deleteRule: (id: string) => void;
-}) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  return (
-    <div className="rounded-xl overflow-hidden border border-white/[0.06]">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-3 px-4 py-3 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
-      >
-        <Icons.chevronRight className={cn("text-white/40 transition-transform", isExpanded && "rotate-90")} />
-        <span className="flex-1 text-left text-[13px] text-white/70">{title}</span>
-        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.06] text-white/50">
-          {rules.filter(r => r.isEnabled).length}/{rules.length}
-        </span>
-      </button>
-
-      {isExpanded && (
-        <div className="border-t border-white/[0.06]">
-          {rules.map(rule => (
-            <div
-              key={rule.id}
-              className={cn(
-                "px-4 py-3 border-b last:border-b-0 border-white/[0.04] transition-colors",
-                !rule.isEnabled && "opacity-50"
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => toggleRule(rule.id)}
-                  className={cn(
-                    "w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-colors",
-                    rule.isEnabled
-                      ? "bg-emerald-500/20 border border-emerald-500/40"
-                      : "border border-white/20 hover:border-white/40"
-                  )}
-                >
-                  {rule.isEnabled && (
-                    <Icons.checkCircle className="w-3 h-3 text-emerald-400" />
-                  )}
-                </button>
-                <p className="flex-1 text-[12px] text-white/70 truncate">{rule.name}</p>
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </div>
