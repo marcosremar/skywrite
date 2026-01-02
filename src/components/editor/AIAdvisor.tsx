@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { useRules, useReferenceFiles } from "@/hooks/useRules";
 
 // Minimal Icons
 const Icons = {
@@ -35,6 +36,42 @@ const Icons = {
   chevronUp: (props: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
       <path d="m18 15-6-6-6 6" />
+    </svg>
+  ),
+  settings: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
+  x: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+    </svg>
+  ),
+  chevronRight: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  ),
+  upload: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" x2="12" y1="3" y2="15" />
+    </svg>
+  ),
+  file: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" />
+    </svg>
+  ),
+  trash: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+    </svg>
+  ),
+  checkCircle: (props: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      <circle cx="12" cy="12" r="10" opacity="0.2" fill="currentColor" /><path d="m9 12 2 2 4-4" />
     </svg>
   ),
 };
@@ -79,6 +116,7 @@ export function AIAdvisor({ content, fileName, className }: AIAdvisorProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(["content", "structure", "citation", "style", "methodology"]));
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const lastContentRef = useRef<string>("");
@@ -179,8 +217,22 @@ export function AIAdvisor({ content, fileName, className }: AIAdvisorProps) {
           {isAnalyzing && !analysis && (
             <Icons.spinner className="w-6 h-6 text-white/40 animate-spin flex-shrink-0" />
           )}
+
+          {/* Settings Button */}
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-colors flex-shrink-0"
+            title="Configurações"
+          >
+            <Icons.settings />
+          </button>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <SettingsPanel onClose={() => setShowSettings(false)} />
+      )}
 
       {/* Main Content - Issues List (Grammarly-style) */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
@@ -477,6 +529,265 @@ function ChatPanel() {
           <Icons.send />
         </button>
       </div>
+    </div>
+  );
+}
+
+// Settings Panel Component
+function SettingsPanel({ onClose }: { onClose: () => void }) {
+  const { rules, loading, toggleRule, deleteRule, refetch: refetchRules } = useRules();
+  const { files, uploading, uploadFile, deleteFile, refetch: refetchFiles } = useReferenceFiles();
+  const [expandedRule, setExpandedRule] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const systemRules = rules.filter(r => r.type === "SYSTEM");
+  const userRules = rules.filter(r => r.type === "USER");
+  const referenceRules = rules.filter(r => r.type === "REFERENCE");
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await uploadFile(file);
+      await Promise.all([refetchRules(), refetchFiles()]);
+    } catch (err) {
+      console.error("Failed to upload file:", err);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDeleteFile = async () => {
+    if (!deleteConfirm) return;
+    try {
+      await deleteFile(deleteConfirm.id);
+      setDeleteConfirm(null);
+    } catch (err) {
+      console.error("Failed to delete file:", err);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative bg-[#16181c] border border-white/10 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+          <div className="flex items-center gap-3">
+            <Icons.settings className="text-white/50" />
+            <h2 className="text-[16px] font-semibold text-white/90">Configurações</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
+          >
+            <Icons.x />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+          {/* Reference Files Section */}
+          <div>
+            <h3 className="text-[13px] font-medium text-white/70 mb-3">Arquivos de Referência</h3>
+            <p className="text-[12px] text-white/40 mb-3">
+              Envie artigos ou teses de exemplo para extrair regras de escrita automaticamente.
+            </p>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.md,.pdf,.docx"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-white/[0.04] border border-dashed border-white/[0.15] hover:border-white/[0.25] hover:bg-white/[0.06] transition-all text-[13px] text-white/60 disabled:opacity-50"
+            >
+              {uploading ? (
+                <Icons.spinner className="w-4 h-4 animate-spin" />
+              ) : (
+                <Icons.upload className="w-4 h-4" />
+              )}
+              <span>{uploading ? "Analisando..." : "Enviar Arquivo"}</span>
+            </button>
+
+            {/* Uploaded files list */}
+            {files.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {files.map(file => (
+                  <div
+                    key={file.id}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
+                  >
+                    <Icons.file className="w-4 h-4 text-white/40" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-white/70 truncate">{file.originalName}</p>
+                      <p className="text-[11px] text-white/40">
+                        {file._count?.rules ?? 0} regras extraídas
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setDeleteConfirm({ id: file.id, name: file.originalName })}
+                      className="p-1.5 rounded-lg text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    >
+                      <Icons.trash />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Rules Section */}
+          <div>
+            <h3 className="text-[13px] font-medium text-white/70 mb-3">
+              Regras Ativas ({rules.filter(r => r.isEnabled).length}/{rules.length})
+            </h3>
+
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Icons.spinner className="w-6 h-6 text-white/40 animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {/* System Rules */}
+                {systemRules.length > 0 && (
+                  <RuleGroup
+                    title="Sistema"
+                    rules={systemRules}
+                    expandedRule={expandedRule}
+                    setExpandedRule={setExpandedRule}
+                    toggleRule={toggleRule}
+                    deleteRule={deleteRule}
+                  />
+                )}
+
+                {/* Reference Rules */}
+                {referenceRules.length > 0 && (
+                  <RuleGroup
+                    title="De Referências"
+                    rules={referenceRules}
+                    expandedRule={expandedRule}
+                    setExpandedRule={setExpandedRule}
+                    toggleRule={toggleRule}
+                    deleteRule={deleteRule}
+                  />
+                )}
+
+                {/* User Rules */}
+                {userRules.length > 0 && (
+                  <RuleGroup
+                    title="Personalizadas"
+                    rules={userRules}
+                    expandedRule={expandedRule}
+                    setExpandedRule={setExpandedRule}
+                    toggleRule={toggleRule}
+                    deleteRule={deleteRule}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteConfirm(null)} />
+          <div className="relative bg-[#1a1e22] border border-white/10 rounded-xl p-5 w-[320px]">
+            <h3 className="text-[15px] font-medium text-white/90 mb-2">Excluir arquivo?</h3>
+            <p className="text-[13px] text-white/50 mb-4 break-words">{deleteConfirm.name}</p>
+            <p className="text-[12px] text-white/30 mb-4">As regras extraídas também serão excluídas.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 px-4 py-2.5 text-[13px] text-white/60 bg-white/[0.05] hover:bg-white/[0.08] rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteFile}
+                className="flex-1 px-4 py-2.5 text-[13px] text-white bg-red-500/80 hover:bg-red-500 rounded-lg transition-colors"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Rule Group Component
+function RuleGroup({
+  title,
+  rules,
+  expandedRule,
+  setExpandedRule,
+  toggleRule,
+  deleteRule,
+}: {
+  title: string;
+  rules: any[];
+  expandedRule: string | null;
+  setExpandedRule: (id: string | null) => void;
+  toggleRule: (id: string) => void;
+  deleteRule: (id: string) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-white/[0.06]">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center gap-3 px-4 py-3 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
+      >
+        <Icons.chevronRight className={cn("text-white/40 transition-transform", isExpanded && "rotate-90")} />
+        <span className="flex-1 text-left text-[13px] text-white/70">{title}</span>
+        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.06] text-white/50">
+          {rules.filter(r => r.isEnabled).length}/{rules.length}
+        </span>
+      </button>
+
+      {isExpanded && (
+        <div className="border-t border-white/[0.06]">
+          {rules.map(rule => (
+            <div
+              key={rule.id}
+              className={cn(
+                "px-4 py-3 border-b last:border-b-0 border-white/[0.04] transition-colors",
+                !rule.isEnabled && "opacity-50"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => toggleRule(rule.id)}
+                  className={cn(
+                    "w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-colors",
+                    rule.isEnabled
+                      ? "bg-emerald-500/20 border border-emerald-500/40"
+                      : "border border-white/20 hover:border-white/40"
+                  )}
+                >
+                  {rule.isEnabled && (
+                    <Icons.checkCircle className="w-3 h-3 text-emerald-400" />
+                  )}
+                </button>
+                <p className="flex-1 text-[12px] text-white/70 truncate">{rule.name}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
