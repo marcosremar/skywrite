@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import Link from "next/link";
-import { FileTree } from "./FileTree";
+import { SectionNav } from "./SectionNav";
 import { MarkdownEditor, MarkdownEditorRef } from "./MarkdownEditor";
 import { EditorToolbar } from "./EditorToolbar";
 import { BibliographyEditor } from "./BibliographyEditor";
 import { AIAdvisor } from "./AIAdvisor";
 import { Button } from "@/components/ui/button";
-import { LogoIcon } from "@/components/ui/logo";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { usePageTitle } from "@/components/ui/page-title";
+import { SECTION_LABELS, type SectionType } from "@/types/thesis-analysis";
 
 // Inline SVG Icons (replacing Lucide)
 const Icons = {
@@ -112,7 +112,6 @@ const Icons = {
     </svg>
   ),
 };
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -128,6 +127,7 @@ interface EditorPreferences {
   showPdfPanel: boolean;
   showAdvisorPanel: boolean;
   showSidebar: boolean;
+  sidebarCollapsed: boolean;
   panelSizes: number[];
   focusMode: boolean;
 }
@@ -139,6 +139,7 @@ const getDefaultPreferences = (): EditorPreferences => {
     showPdfPanel: !isSmallScreen,
     showAdvisorPanel: !isSmallScreen,
     showSidebar: !isSmallScreen,
+    sidebarCollapsed: false,
     panelSizes: [15, 55, 30],
     focusMode: false,
   };
@@ -148,6 +149,7 @@ const defaultPreferences: EditorPreferences = {
   showPdfPanel: true,
   showAdvisorPanel: true,
   showSidebar: true,
+  sidebarCollapsed: false,
   panelSizes: [15, 55, 30],
   focusMode: false,
 };
@@ -232,6 +234,15 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
 
   const editorRef = useRef<MarkdownEditorRef>(null);
   const { preferences, updatePreferences, isLoaded } = useEditorPreferences();
+  const { setTitle, clearTitle } = usePageTitle();
+
+  // Set page title in header - show section label instead of filename
+  useEffect(() => {
+    const section = selectedFile?.section as SectionType | undefined;
+    const sectionLabel = section ? SECTION_LABELS[section] : selectedFile?.name?.replace('.md', '') || '';
+    setTitle(project.name, sectionLabel);
+    return () => clearTitle();
+  }, [project.name, selectedFile?.section, selectedFile?.name, setTitle, clearTitle]);
 
   // Detect mobile/tablet
   useEffect(() => {
@@ -244,13 +255,15 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   }, []);
 
   // Destructure preferences
-  const { showPdfPanel, showAdvisorPanel, showSidebar, focusMode } = preferences;
+  const { showPdfPanel, showAdvisorPanel, showSidebar, sidebarCollapsed, focusMode } = preferences;
 
   // Handlers
   const handleUndo = useCallback(() => editorRef.current?.undo(), []);
   const handleRedo = useCallback(() => editorRef.current?.redo(), []);
+  const handleScrollToLine = useCallback((lineNumber: number) => editorRef.current?.scrollToLine(lineNumber), []);
 
   const toggleSidebar = () => updatePreferences({ showSidebar: !showSidebar });
+  const toggleSidebarCollapse = () => updatePreferences({ sidebarCollapsed: !sidebarCollapsed });
   const togglePdfPanel = () => updatePreferences({ showPdfPanel: !showPdfPanel });
   const toggleAdvisorPanel = () => updatePreferences({ showAdvisorPanel: !showAdvisorPanel });
   const toggleFocusMode = () => updatePreferences({ focusMode: !focusMode });
@@ -390,7 +403,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   // Loading state
   if (!isLoaded) {
     return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-background">
+      <div className="flex h-[calc(100vh-3rem)] items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="h-12 w-12 rounded-full border-4 border-muted" />
@@ -406,146 +419,107 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
 
   return (
     <div className={cn(
-      "h-[calc(100vh-4rem)]",
+      "h-[calc(100vh-3rem)] flex",
       focusMode && "focus-mode",
       isMobile && "pb-16" // Padding for mobile bottom nav
     )}>
+      {/* Sidebar - Section Navigation (Desktop only) */}
+      {showSidebar && !isMobile && (
+        <div
+          className={cn(
+            "h-full bg-sidebar border-r border-sidebar-border/50 flex-shrink-0 transition-all duration-200 relative",
+            sidebarCollapsed ? "w-14 overflow-visible" : "w-56 overflow-hidden"
+          )}
+        >
+          <SectionNav
+            projectName={project.name}
+            projectUniversity={project.university || undefined}
+            projectTitle={project.title || undefined}
+            projectAuthor={project.author || undefined}
+            files={files}
+            selectedFile={selectedFile}
+            onFileSelect={(file) => {
+              handleFileSelect(file);
+              // Auto-collapse after selecting a section
+              if (!sidebarCollapsed) {
+                updatePreferences({ sidebarCollapsed: true });
+              }
+            }}
+            projectId={project.id}
+            isCollapsed={sidebarCollapsed}
+            onToggleCollapse={toggleSidebarCollapse}
+            onFileCreated={(file) => {
+              setFiles((prev) => [...prev, file]);
+              // Auto-collapse after creating a section
+              if (!sidebarCollapsed) {
+                updatePreferences({ sidebarCollapsed: true });
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* Main Content Area */}
       <ResizablePanelGroup
         direction="horizontal"
-        className="h-full"
+        className="h-full overflow-hidden flex-1"
         onLayout={handlePanelResize}
+        style={{ overflow: 'hidden' }}
       >
-        {/* Sidebar - File Tree (Desktop only) */}
-        {showSidebar && !isMobile && (
-          <>
-            <ResizablePanel
-              defaultSize={preferences.panelSizes[0] || 15}
-              minSize={12}
-              maxSize={25}
-              className="sidebar-panel bg-sidebar"
-            >
-              <div className="h-full flex flex-col">
-                {/* Project Header */}
-                <div className="p-4 border-b border-sidebar-border">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <LogoIcon size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h2 className="font-semibold text-sm truncate text-sidebar-foreground">
-                        {project.name}
-                      </h2>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {project.university || "Minha Tese"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* File Tree */}
-                <FileTree
-                  files={files}
-                  selectedFile={selectedFile}
-                  onSelect={handleFileSelect}
-                  projectId={project.id}
-                  onFileCreated={(file) => setFiles((prev) => [...prev, file])}
-                  onFileDeleted={(fileId) => {
-                    setFiles((prev) => prev.filter((f) => f.id !== fileId));
-                    if (selectedFile?.id === fileId) {
-                      const remaining = files.filter((f) => f.id !== fileId);
-                      setSelectedFile(remaining[0] || null);
-                      setContent(remaining[0]?.content || "");
-                    }
-                  }}
-                  onFileRenamed={(updatedFile) => {
-                    setFiles((prev) =>
-                      prev.map((f) => (f.id === updatedFile.id ? updatedFile : f))
-                    );
-                    if (selectedFile?.id === updatedFile.id) {
-                      setSelectedFile(updatedFile);
-                    }
-                  }}
-                />
-              </div>
-            </ResizablePanel>
-
-            <ResizableHandle withHandle className="bg-sidebar-border hover:bg-primary/50 transition-colors" />
-          </>
-        )}
-
         {/* Main Editor Area */}
         <ResizablePanel
           defaultSize={showAdvisorPanel ? (preferences.panelSizes[1] || 55) : 85}
-          minSize={40}
+          minSize={30}
         >
           <div className="h-full flex flex-col bg-background">
-            {/* Toolbar - Responsive */}
-            <div className="border-b border-border bg-card px-2 py-1.5">
-              <div className="flex items-center gap-1 flex-wrap sm:flex-nowrap">
-                {/* Left side: Navigation and editing tools */}
-                <div className="flex items-center gap-0.5 flex-shrink-0">
-                  <Link href="/projects">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Voltar">
-                      <Icons.arrowLeft className="h-3.5 w-3.5" />
-                    </Button>
-                  </Link>
+            {/* Toolbar */}
+            <div className="border-b border-border/30 bg-card/50 px-2 py-1.5 flex flex-wrap items-center gap-1">
+              {/* Mobile: Show menu button for files */}
+              {isMobile && (
+                <Button variant="ghost" size="sm" onClick={() => setMobileFilesOpen(true)} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground flex-shrink-0" title="Seções">
+                  <Icons.menu className="h-3.5 w-3.5" />
+                </Button>
+              )}
 
-                  {/* Mobile: Show menu button for files */}
-                  {isMobile && (
-                    <Button variant="ghost" size="sm" onClick={() => setMobileFilesOpen(true)} className="h-7 w-7 p-0" title="Arquivos">
-                      <Icons.menu className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+              {/* Editing tools - wraps when needed */}
+              <EditorToolbar onInsert={(text) => setContent((prev) => prev + text)} onUndo={handleUndo} onRedo={handleRedo} />
 
-                  {/* Desktop: Show sidebar toggle */}
-                  {!isMobile && (
-                    <Button variant="ghost" size="sm" onClick={toggleSidebar} className="h-7 w-7 p-0" title="Arquivos">
-                      {showSidebar ? <Icons.panelLeftClose className="h-3.5 w-3.5" /> : <Icons.panelLeft className="h-3.5 w-3.5" />}
-                    </Button>
-                  )}
+              <div className="h-4 w-px bg-border/30 mx-1 flex-shrink-0" />
+              <BibliographyEditor bibContent={bibContent} onSave={handleSaveBibliography} />
 
-                  <div className="h-4 w-px bg-border hidden sm:block" />
-                  <EditorToolbar onInsert={(text) => setContent((prev) => prev + text)} onUndo={handleUndo} onRedo={handleRedo} />
-                  <div className="h-4 w-px bg-border hidden sm:block" />
-                  <BibliographyEditor bibContent={bibContent} onSave={handleSaveBibliography} />
-                </div>
+              {/* Spacer */}
+              <div className="flex-1 min-w-4" />
 
-                {/* Spacer */}
-                <div className="flex-1 min-w-1" />
+              {/* Right: Actions */}
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                {/* Save button */}
+                <Button variant="ghost" size="sm" onClick={handleSave} disabled={isSaving} className="h-7 px-2 gap-1.5 text-muted-foreground hover:text-foreground hidden sm:flex" title="Salvar">
+                  {isSaving ? <Icons.loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icons.save className="h-3.5 w-3.5" />}
+                  <span className="hidden lg:inline text-xs">Salvar</span>
+                </Button>
 
-                {/* Right side: Actions */}
-                <div className="flex items-center gap-0.5 flex-shrink-0">
-                  {/* Save button - hidden on mobile (available in bottom nav) */}
-                  <Button variant="ghost" size="sm" onClick={handleSave} disabled={isSaving} className="h-7 w-7 p-0 hidden sm:flex sm:w-auto sm:px-2 sm:gap-1" title="Salvar">
-                    {isSaving ? <Icons.loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icons.save className="h-3.5 w-3.5" />}
-                    <span className="hidden xl:inline text-xs">Salvar</span>
-                  </Button>
-                  {/* Export PDF - hidden on mobile (available in bottom nav) */}
-                  <Button variant="default" size="sm" onClick={handleExportPdf} disabled={isBuilding} className="h-7 px-2 gap-1 hidden sm:flex" title="Exportar PDF">
-                    {isBuilding ? <Icons.loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icons.fileDown className="h-3.5 w-3.5" />}
-                    <span className="hidden md:inline text-xs">PDF</span>
-                  </Button>
-                  <div className="h-4 w-px bg-border hidden sm:block" />
-                  {/* Preview toggle - hidden on mobile */}
-                  <Button variant="ghost" size="sm" onClick={togglePdfPanel} className={cn("h-7 w-7 p-0 hidden lg:flex", showPdfPanel && "bg-muted")} title="Preview">
-                    {showPdfPanel ? <Icons.eyeOff className="h-3.5 w-3.5" /> : <Icons.eye className="h-3.5 w-3.5" />}
-                  </Button>
-                  {/* AI Advisor toggle - hidden on mobile (available in bottom nav) */}
-                  <Button variant="ghost" size="sm" onClick={() => isMobile ? setMobileAdvisorOpen(true) : toggleAdvisorPanel()} className={cn("h-7 w-7 p-0 hidden sm:flex", showAdvisorPanel && "bg-muted")} title="IA">
-                    <Icons.sparkles className={cn("h-3.5 w-3.5", showAdvisorPanel && "text-advisor")} />
-                  </Button>
-                  {/* Focus mode - desktop only */}
-                  <Button variant="ghost" size="sm" onClick={toggleFocusMode} className={cn("h-7 w-7 p-0 hidden lg:flex", focusMode && "bg-muted")} title="Foco">
-                    {focusMode ? <Icons.minimize2 className="h-3.5 w-3.5" /> : <Icons.maximize2 className="h-3.5 w-3.5" />}
-                  </Button>
+                {/* Export PDF */}
+                <Button variant="default" size="sm" onClick={handleExportPdf} disabled={isBuilding} className="h-7 px-2.5 gap-1.5 hidden sm:flex" title="Exportar PDF">
+                  {isBuilding ? <Icons.loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icons.fileDown className="h-3.5 w-3.5" />}
+                  <span className="hidden md:inline text-xs">PDF</span>
+                </Button>
 
-                  {/* Mobile: Show current file name */}
-                  {isMobile && selectedFile && (
-                    <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-                      {selectedFile.name}
-                    </span>
-                  )}
-                </div>
+                <div className="h-4 w-px bg-border/30 mx-1 hidden lg:block" />
+
+                {/* Preview toggle */}
+                <Button variant="ghost" size="sm" onClick={togglePdfPanel} className={cn("h-7 w-7 p-0 text-muted-foreground hover:text-foreground hidden lg:flex", showPdfPanel && "bg-muted text-foreground")} title="Preview">
+                  {showPdfPanel ? <Icons.eyeOff className="h-3.5 w-3.5" /> : <Icons.eye className="h-3.5 w-3.5" />}
+                </Button>
+
+                {/* AI Advisor toggle */}
+                <Button variant="ghost" size="sm" onClick={() => isMobile ? setMobileAdvisorOpen(true) : toggleAdvisorPanel()} className={cn("h-7 w-7 p-0 text-muted-foreground hover:text-foreground hidden sm:flex", showAdvisorPanel && "bg-muted text-advisor")} title="IA">
+                  <Icons.sparkles className="h-3.5 w-3.5" />
+                </Button>
+
+                {/* Focus mode */}
+                <Button variant="ghost" size="sm" onClick={toggleFocusMode} className={cn("h-7 w-7 p-0 text-muted-foreground hover:text-foreground hidden lg:flex", focusMode && "bg-muted text-foreground")} title="Foco">
+                  {focusMode ? <Icons.minimize2 className="h-3.5 w-3.5" /> : <Icons.maximize2 className="h-3.5 w-3.5" />}
+                </Button>
               </div>
             </div>
 
@@ -557,51 +531,14 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                 showPdfPanel && "sm:border-r border-border",
                 showPdfPanel && "max-h-[60%] sm:max-h-full"
               )}>
-                <Tabs defaultValue="edit" className="h-full flex flex-col">
-                  <TabsList className="mx-4 mt-2 w-fit">
-                    <TabsTrigger value="edit" className="text-xs">Editar</TabsTrigger>
-                    <TabsTrigger value="metadata" className="text-xs">Metadados</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="edit" className="flex-1 h-full min-h-0 p-0 m-0 overflow-hidden">
-                    <MarkdownEditor
-                      key={`editor-${selectedFile?.path || selectedFile?.id || "no-file"}`}
-                      ref={editorRef}
-                      value={content}
-                      onChange={setContent}
-                      filename={selectedFile?.name || ""}
-                      bibContent={bibContent}
-                    />
-                  </TabsContent>
-
-                  <TabsContent value="metadata" className="flex-1 p-6 overflow-auto">
-                    <div className="max-w-lg space-y-6">
-                      <h3 className="font-semibold font-[family-name:var(--font-display)] text-lg">
-                        Informações do Projeto
-                      </h3>
-                      <div className="grid gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-primary">Título</label>
-                          <p className="text-sm text-foreground bg-muted p-3 rounded-lg">
-                            {project.title || "Não definido"}
-                          </p>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-primary">Autor</label>
-                          <p className="text-sm text-foreground bg-muted p-3 rounded-lg">
-                            {project.author || "Não definido"}
-                          </p>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-primary">Universidade</label>
-                          <p className="text-sm text-foreground bg-muted p-3 rounded-lg">
-                            {project.university || "Não definido"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                <MarkdownEditor
+                  key={`editor-${selectedFile?.path || selectedFile?.id || "no-file"}`}
+                  ref={editorRef}
+                  value={content}
+                  onChange={setContent}
+                  filename={selectedFile?.name || ""}
+                  bibContent={bibContent}
+                />
               </div>
 
               {/* Preview Panel */}
@@ -682,13 +619,16 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
               defaultSize={preferences.panelSizes[2] || 30}
               minSize={20}
               maxSize={40}
-              className="advisor-panel"
+              className="min-w-0 overflow-hidden"
             >
-              <AIAdvisor
-                key={`advisor-${selectedFile?.id || "no-file"}`}
-                content={currentFileContent}
-                fileName={selectedFile?.name || ""}
-              />
+              <div className="h-full w-full min-w-0 overflow-hidden">
+                <AIAdvisor
+                  key={`advisor-${selectedFile?.id || "no-file"}`}
+                  content={currentFileContent}
+                  fileName={selectedFile?.name || ""}
+                  onScrollToLine={handleScrollToLine}
+                />
+              </div>
             </ResizablePanel>
           </>
         )}
@@ -754,59 +694,25 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
         </div>
       )}
 
-      {/* Mobile Files Sheet */}
+      {/* Mobile Sections Sheet */}
       <Sheet open={mobileFilesOpen} onOpenChange={setMobileFilesOpen}>
         <SheetContent side="left" className="w-[85%] max-w-xs p-0">
-          <div className="h-full flex flex-col">
-            {/* Header */}
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <LogoIcon size={20} />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-sm truncate">{project.name}</h2>
-                  <p className="text-xs text-muted-foreground">{project.university || "Minha Tese"}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setMobileFilesOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-muted"
-              >
-                <Icons.x className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* File Tree */}
-            <div className="flex-1 overflow-hidden">
-              <FileTree
-                files={files}
-                selectedFile={selectedFile}
-                onSelect={(file) => {
-                  handleFileSelect(file);
-                  setMobileFilesOpen(false);
-                }}
-                projectId={project.id}
-                onFileCreated={(file) => setFiles((prev) => [...prev, file])}
-                onFileDeleted={(fileId) => {
-                  setFiles((prev) => prev.filter((f) => f.id !== fileId));
-                  if (selectedFile?.id === fileId) {
-                    const remaining = files.filter((f) => f.id !== fileId);
-                    setSelectedFile(remaining[0] || null);
-                    setContent(remaining[0]?.content || "");
-                  }
-                }}
-                onFileRenamed={(updatedFile) => {
-                  setFiles((prev) =>
-                    prev.map((f) => (f.id === updatedFile.id ? updatedFile : f))
-                  );
-                  if (selectedFile?.id === updatedFile.id) {
-                    setSelectedFile(updatedFile);
-                  }
-                }}
-              />
-            </div>
-          </div>
+          <SectionNav
+            projectName={project.name}
+            projectUniversity={project.university || undefined}
+            projectTitle={project.title || undefined}
+            projectAuthor={project.author || undefined}
+            files={files}
+            selectedFile={selectedFile}
+            onFileSelect={(file) => {
+              handleFileSelect(file);
+              setMobileFilesOpen(false);
+            }}
+            projectId={project.id}
+            isCollapsed={false}
+            onToggleCollapse={() => setMobileFilesOpen(false)}
+            onFileCreated={(file) => setFiles((prev) => [...prev, file])}
+          />
         </SheetContent>
       </Sheet>
 
@@ -833,6 +739,10 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                 key={`mobile-advisor-${selectedFile?.id || "no-file"}`}
                 content={currentFileContent}
                 fileName={selectedFile?.name || ""}
+                onScrollToLine={(lineNumber) => {
+                  setMobileAdvisorOpen(false);
+                  handleScrollToLine(lineNumber);
+                }}
               />
             </div>
           </div>

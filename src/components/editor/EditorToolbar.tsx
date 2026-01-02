@@ -55,7 +55,7 @@ export function EditorToolbar({ onInsert, onUndo, onRedo, canUndo = true, canRed
   ];
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex flex-wrap items-center gap-0.5">
       {/* Undo/Redo */}
       <Button
         variant="ghost"
@@ -78,102 +78,37 @@ export function EditorToolbar({ onInsert, onUndo, onRedo, canUndo = true, canRed
         {Icons.redo}
       </Button>
 
-      <Separator orientation="vertical" className="h-4 mx-1 hidden sm:block" />
+      <Separator orientation="vertical" className="h-4 mx-1" />
 
-      {/* Large screens: All buttons visible */}
-      <div className="hidden lg:flex items-center gap-0.5">
-        {tools.map((tool) => (
-          <Button
-            key={tool.id}
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 font-mono text-xs font-semibold"
-            title={tool.title}
-            onClick={() => onInsert(tool.insert)}
-          >
-            {tool.label}
-          </Button>
-        ))}
-        <Separator orientation="vertical" className="h-4 mx-1" />
-        {insertions.map((item) => (
-          <Button
-            key={item.id}
-            variant="ghost"
-            size="sm"
-            className="h-7 px-1.5 text-xs"
-            title={item.title}
-            onClick={() => onInsert(item.insert)}
-          >
-            {item.label}
-          </Button>
-        ))}
-      </div>
+      {/* Formatting tools */}
+      {tools.map((tool) => (
+        <Button
+          key={tool.id}
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 font-mono text-xs font-semibold"
+          title={tool.title}
+          onClick={() => onInsert(tool.insert)}
+        >
+          {tool.label}
+        </Button>
+      ))}
 
-      {/* Medium screens: Some buttons + dropdown */}
-      <div className="hidden sm:flex lg:hidden items-center gap-0.5">
-        {tools.slice(0, 2).map((tool) => (
-          <Button
-            key={tool.id}
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 font-mono text-xs font-semibold"
-            title={tool.title}
-            onClick={() => onInsert(tool.insert)}
-          >
-            {tool.label}
-          </Button>
-        ))}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-1.5 gap-0.5 text-xs">
-              <span>+</span>
-              {Icons.chevronDown}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {tools.slice(2).map((tool) => (
-              <DropdownMenuItem key={tool.id} onClick={() => onInsert(tool.insert)}>
-                <span className="font-mono font-semibold w-8">{tool.label}</span>
-                {tool.title}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            {insertions.map((item) => (
-              <DropdownMenuItem key={item.id} onClick={() => onInsert(item.insert)}>
-                <span className="w-8 text-xs">{item.label}</span>
-                {item.title}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <Separator orientation="vertical" className="h-4 mx-1" />
 
-      {/* Small screens: Single dropdown */}
-      <div className="flex sm:hidden items-center">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-xs">
-              <span className="font-mono font-semibold">Aa</span>
-              {Icons.chevronDown}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {tools.map((tool) => (
-              <DropdownMenuItem key={tool.id} onClick={() => onInsert(tool.insert)}>
-                <span className="font-mono font-semibold w-8">{tool.label}</span>
-                {tool.title}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            {insertions.map((item) => (
-              <DropdownMenuItem key={item.id} onClick={() => onInsert(item.insert)}>
-                <span className="w-8 text-xs">{item.label}</span>
-                {item.title}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      {/* Insertion tools */}
+      {insertions.map((item) => (
+        <Button
+          key={item.id}
+          variant="ghost"
+          size="sm"
+          className="h-7 px-1.5 text-xs"
+          title={item.title}
+          onClick={() => onInsert(item.insert)}
+        >
+          {item.label}
+        </Button>
+      ))}
     </div>
   );
 }

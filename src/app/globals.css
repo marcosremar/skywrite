@@ -678,3 +678,18 @@ h1, h2, h3, h4, h5, h6 {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* ============================================
+   RESIZABLE PANEL OVERRIDES
+   ============================================ */
+[data-panel-resize-handle-id] {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-panel-resize-handle-id]:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-panel-resize-handle-id][data-resize-handle-active] {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
