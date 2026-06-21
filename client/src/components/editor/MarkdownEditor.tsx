@@ -132,6 +132,7 @@ interface MarkdownEditorProps {
 export interface MarkdownEditorRef {
   undo: () => void;
   redo: () => void;
+  insertAtCursor: (text: string) => void;
 }
 
 // Parse BibTeX content to extract citation entries
@@ -1150,6 +1151,16 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
       if (view) {
         redo(view);
       }
+    },
+    insertAtCursor: (text: string) => {
+      const view = editorRef.current?.view;
+      if (!view) return;
+      const { from, to } = view.state.selection.main;
+      view.dispatch({
+        changes: { from, to, insert: text },
+        selection: { anchor: from + text.length },
+      });
+      view.focus();
     },
   }), []);
 

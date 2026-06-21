@@ -103,6 +103,15 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   const [isBuilding, setIsBuilding] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<"preview" | "advisor">("preview");
+  const [metadata, setMetadata] = useState({
+    name: project.name || "",
+    title: project.title || "",
+    subtitle: project.subtitle || "",
+    author: project.author || "",
+    university: project.university || "",
+    language: project.language || "pt-BR",
+  });
+  const [savingMetadata, setSavingMetadata] = useState(false);
   const [buildError, setBuildError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
@@ -191,6 +200,39 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
     } finally {
       setIsBuilding(false);
     }
+  };
+
+  const handleSaveMetadata = async () => {
+    setSavingMetadata(true);
+    try {
+      await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(metadata),
+      });
+    } finally {
+      setSavingMetadata(false);
+    }
+  };
+
+  const handleInsertImage = async (file: File) => {
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(",")[1] || "");
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
+    const filePath = `media/${safeName}`;
+    const response = await fetch(`/api/projects/${project.id}/files`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: filePath, content: base64, type: "IMAGE" }),
+    });
+    if (!response.ok) return;
+    const { file: created } = await response.json();
+    setFiles((prev) => [...prev, created]);
+    editorRef.current?.insertAtCursor(`\n![${file.name}](${filePath})\n`);
   };
 
   const handleSaveBibliography = async (newBibContent: string) => {
@@ -351,7 +393,8 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                   <div className="h-5 w-px bg-border mx-1" />
 
                   <EditorToolbar
-                    onInsert={(text) => setContent((prev) => prev + text)}
+                    onInsert={(text) => editorRef.current?.insertAtCursor(text)}
+                    onInsertImage={handleInsertImage}
                     onUndo={handleUndo}
                     onRedo={handleRedo}
                   />
@@ -460,24 +503,26 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                         Informações do Projeto
                       </h3>
                       <div className="grid gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-primary">Título</label>
-                          <p className="text-sm text-foreground bg-muted p-3 rounded-lg">
-                            {project.title || "Não definido"}
-                          </p>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-primary">Autor</label>
-                          <p className="text-sm text-foreground bg-muted p-3 rounded-lg">
-                            {project.author || "Não definido"}
-                          </p>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-primary">Universidade</label>
-                          <p className="text-sm text-foreground bg-muted p-3 rounded-lg">
-                            {project.university || "Não definido"}
-                          </p>
-                        </div>
+                        {([
+                          ["name", "Nome do projeto"],
+                          ["title", "Título"],
+                          ["subtitle", "Subtítulo"],
+                          ["author", "Autor"],
+                          ["university", "Universidade"],
+                          ["language", "Idioma"],
+                        ] as const).map(([field, label]) => (
+                          <div key={field} className="space-y-1.5">
+                            <label className="text-sm font-medium text-primary">{label}</label>
+                            <input
+                              value={metadata[field]}
+                              onChange={(e) => setMetadata((m) => ({ ...m, [field]: e.target.value }))}
+                              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            />
+                          </div>
+                        ))}
+                        <Button onClick={handleSaveMetadata} disabled={savingMetadata} className="w-fit">
+                          {savingMetadata ? "Salvando..." : "Salvar metadados"}
+                        </Button>
                       </div>
                     </div>
                   </TabsContent>

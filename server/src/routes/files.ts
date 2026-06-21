@@ -1,10 +1,25 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
+import { Prisma } from "@prisma/client";
 import { db } from "../db.js";
 import { requireAuth } from "../auth.js";
 
 export const filesRouter = Router({ mergeParams: true });
 
 filesRouter.use(requireAuth);
+
+function handlePrismaError(error: unknown, res: Response): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2025") {
+      res.status(404).json({ error: "File not found" });
+      return true;
+    }
+    if (error.code === "P2002") {
+      res.status(409).json({ error: "Já existe um arquivo com esse caminho" });
+      return true;
+    }
+  }
+  return false;
+}
 
 filesRouter.post("/", async (req, res) => {
   try {
@@ -37,6 +52,7 @@ filesRouter.post("/", async (req, res) => {
 
     return res.json({ file });
   } catch (error) {
+    if (handlePrismaError(error, res)) return;
     console.error("Error creating file:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
@@ -97,6 +113,7 @@ filesRouter.post("/rename", async (req, res) => {
 
     return res.json({ file });
   } catch (error) {
+    if (handlePrismaError(error, res)) return;
     console.error("Error renaming file:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
@@ -143,6 +160,7 @@ filesRouter.put("/*", async (req, res) => {
     });
     return res.json(file);
   } catch (error) {
+    if (handlePrismaError(error, res)) return;
     console.error("Error updating file:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
@@ -165,6 +183,7 @@ filesRouter.delete("/*", async (req, res) => {
     });
     return res.json({ success: true });
   } catch (error) {
+    if (handlePrismaError(error, res)) return;
     console.error("Error deleting file:", error);
     return res.status(500).json({ error: "Internal server error" });
   }

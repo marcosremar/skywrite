@@ -1,18 +1,22 @@
 "use client";
 
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Undo2, Redo2 } from "lucide-react";
+import { Undo2, Redo2, ImagePlus } from "lucide-react";
 
 interface EditorToolbarProps {
   onInsert: (text: string) => void;
+  onInsertImage?: (file: File) => void;
   onUndo?: () => void;
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
 }
 
-export function EditorToolbar({ onInsert, onUndo, onRedo, canUndo = true, canRedo = true }: EditorToolbarProps) {
+export function EditorToolbar({ onInsert, onInsertImage, onUndo, onRedo, canUndo = true, canRedo = true }: EditorToolbarProps) {
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
   const tools = [
     { label: "B", title: "Negrito", insert: "**texto**" },
     { label: "I", title: "Italico", insert: "*texto*" },
@@ -22,7 +26,6 @@ export function EditorToolbar({ onInsert, onUndo, onRedo, canUndo = true, canRed
   ];
 
   const insertions = [
-    { label: "📷", title: "Imagem", insert: "\n![Legenda](media/imagem.png){#fig:label width=60%}\n" },
     { label: "📊", title: "Tabela", insert: "\n| Col1 | Col2 |\n|------|------|\n| A    | B    |\n\n: Legenda {#tbl:label}\n" },
     { label: "📝", title: "Citacao", insert: "[@autor2023]" },
     { label: "🔗", title: "Referencia", insert: "[@fig:label]" },
@@ -69,6 +72,31 @@ export function EditorToolbar({ onInsert, onUndo, onRedo, canUndo = true, canRed
       ))}
 
       <Separator orientation="vertical" className="h-6 mx-1" />
+
+      {onInsertImage && (
+        <>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onInsertImage(file);
+              e.target.value = "";
+            }}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            title="Inserir imagem"
+            onClick={() => imageInputRef.current?.click()}
+          >
+            <ImagePlus className="h-4 w-4" />
+          </Button>
+        </>
+      )}
 
       {insertions.map((item) => (
         <Button

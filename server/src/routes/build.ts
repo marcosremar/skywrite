@@ -143,7 +143,11 @@ async function runPandocBuild(files: BuildFile[]): Promise<BuildResult> {
     for (const file of files) {
       const filePath = path.join(dir, file.path);
       await mkdir(path.dirname(filePath), { recursive: true });
-      await writeFile(filePath, file.content || "");
+      if (file.type === "IMAGE") {
+        await writeFile(filePath, Buffer.from(file.content || "", "base64"));
+      } else {
+        await writeFile(filePath, file.content || "");
+      }
     }
 
     const markdownFiles = files
@@ -160,6 +164,9 @@ async function runPandocBuild(files: BuildFile[]): Promise<BuildResult> {
     );
     const bibFile = files.find((f) => f.type === "BIBTEX" || f.path.endsWith(".bib"));
 
+    const headerPath = path.join(dir, "skywrite-header.tex");
+    await writeFile(headerPath, "\\providecommand{\\xmpquote}[1]{#1}\n");
+
     const pdfPath = path.join(dir, "output.pdf");
     const args = [
       ...markdownFiles,
@@ -167,6 +174,8 @@ async function runPandocBuild(files: BuildFile[]): Promise<BuildResult> {
       "--toc",
       "--metadata",
       "reference-section-title=Referências",
+      "--include-in-header",
+      headerPath,
       "--resource-path",
       dir,
       "--pdf-engine=tectonic",

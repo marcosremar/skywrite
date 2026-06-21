@@ -90,3 +90,42 @@ projectsRouter.get("/:id", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+const EDITABLE_FIELDS = ["name", "title", "subtitle", "author", "university", "language"] as const;
+
+projectsRouter.patch("/:id", async (req, res) => {
+  try {
+    const body = req.body ?? {};
+    const data: Record<string, string> = {};
+    for (const field of EDITABLE_FIELDS) {
+      if (body[field] !== undefined) data[field] = body[field];
+    }
+    const result = await db.project.updateMany({
+      where: { id: req.params.id, userId: req.userId },
+      data,
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    const project = await db.project.findUnique({ where: { id: req.params.id } });
+    return res.json({ project });
+  } catch (error) {
+    console.error("Error updating project:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+projectsRouter.delete("/:id", async (req, res) => {
+  try {
+    const result = await db.project.deleteMany({
+      where: { id: req.params.id, userId: req.userId },
+    });
+    if (result.count === 0) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting project:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
