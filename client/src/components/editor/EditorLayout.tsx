@@ -180,8 +180,8 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
         method: "POST",
       });
       const data = await response.json();
-      if (response.ok && data.pdfUrl) {
-        setPdfUrl(data.pdfUrl);
+      if (response.ok && data.pdfPath) {
+        setPdfUrl(data.pdfPath);
       } else {
         setBuildError(data.error || data.details || "Build failed");
       }
@@ -544,7 +544,19 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                         </div>
                       </div>
                     ) : pdfUrl ? (
-                      <iframe src={pdfUrl} className="w-full h-full" title="PDF Preview" />
+                      <div className="flex flex-col h-full">
+                        <div className="flex justify-end px-3 py-1.5 border-b border-border">
+                          <a
+                            href={`${pdfUrl}?download=1`}
+                            download
+                            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+                          >
+                            <FileDown className="h-3.5 w-3.5" />
+                            Baixar PDF
+                          </a>
+                        </div>
+                        <iframe src={pdfUrl} className="w-full flex-1" title="PDF Preview" />
+                      </div>
                     ) : (
                       <div className="flex-1 flex items-center justify-center p-6">
                         <div className="text-center max-w-xs">

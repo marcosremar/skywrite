@@ -59,8 +59,8 @@ buildRouter.post("/", async (req, res) => {
         });
 
         return res.json({
-          build: completedBuild,
-          pdfUrl: pdfDataUrl,
+          build: { id: completedBuild.id, status: completedBuild.status, pdfSizeBytes: completedBuild.pdfSizeBytes },
+          pdfPath: `/api/projects/${id}/build/${completedBuild.id}/pdf`,
           message: "Build completed successfully",
         });
       }
@@ -96,10 +96,43 @@ buildRouter.get("/", async (req, res) => {
       where: { projectId: id },
       orderBy: { queuedAt: "desc" },
       take: 10,
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        queuedAt: true,
+        completedAt: true,
+        durationMs: true,
+        pdfSizeBytes: true,
+        errorMessage: true,
+      },
     });
     return res.json({ builds });
   } catch (error) {
     console.error("Error fetching builds:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+buildRouter.get("/:buildId/pdf", async (req, res) => {
+  try {
+    const { id, buildId } = req.params as { id: string; buildId: string };
+    const project = await db.project.findFirst({ where: { id, userId: req.userId } });
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    const build = await db.build.findFirst({ where: { id: buildId, projectId: id } });
+    if (!build?.pdfUrl) {
+      return res.status(404).json({ error: "PDF not found" });
+    }
+    const buffer = Buffer.from(build.pdfUrl.split(",", 2)[1] || "", "base64");
+    const safeName = project.name.replace(/[^a-zA-Z0-9-_]+/g, "_") || "documento";
+    const disposition = req.query.download ? "attachment" : "inline";
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `${disposition}; filename="${safeName}.pdf"`);
+    return res.send(buffer);
+  } catch (error) {
+    console.error("Error serving PDF:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -157,15 +190,20 @@ function runPandoc(args: string[], cwd: string) {
   return new Promise<{ code: number; output: string }>((resolve) => {
     const pandoc = spawn("pandoc", args, { cwd });
     let output = "";
+    let settled = false;
+    const finish = (result: { code: number; output: string }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      pandoc.kill();
+      finish({ code: 1, output: "Build timed out after 5 minutes" });
+    }, 5 * 60 * 1000);
     pandoc.stdout.on("data", (d) => (output += d.toString()));
     pandoc.stderr.on("data", (d) => (output += d.toString()));
-    pandoc.on("error", (err) =>
-      resolve({ code: 1, output: `Failed to start pandoc: ${err.message}` })
-    );
-    pandoc.on("close", (code) => resolve({ code: code ?? 1, output }));
-    setTimeout(() => {
-      pandoc.kill();
-      resolve({ code: 1, output: "Build timed out after 5 minutes" });
-    }, 5 * 60 * 1000);
+    pandoc.on("error", (err) => finish({ code: 1, output: `Failed to start pandoc: ${err.message}` }));
+    pandoc.on("close", (code) => finish({ code: code ?? 1, output }));
   });
 }

@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
+const JWT_SECRET = process.env.JWT_SECRET || "";
 const TOKEN_COOKIE = "token";
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 

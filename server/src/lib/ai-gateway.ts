@@ -20,6 +20,16 @@ function authHeaders() {
   };
 }
 
+export async function pingGateway(): Promise<boolean> {
+  if (!GATEWAY_KEY) return false;
+  try {
+    const res = await fetch(`${GATEWAY_URL}/health`, { signal: AbortSignal.timeout(1500) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function searchWeb(query: string, maxResults = 6): Promise<SearchSource[]> {
   const res = await fetch(`${GATEWAY_URL}/v1/search`, {
     method: "POST",
