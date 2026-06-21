@@ -1,84 +1,67 @@
-# Skywrite on Alpine Linux - Orbit Stack
+# Skywrite
 
-Este diretório contém a configuração para criar uma VM Alpine Linux no Orbit Stack com o projeto Skywrite instalado e configurado.
+Plataforma de escrita de teses: editor Markdown com preview, orientador de IA, templates academicos e geracao de PDF.
 
-## Arquivos
+Stack: **React (Vite)** no front e **Express + Prisma (PostgreSQL)** no back.
 
-- `skywrite-vm.yml` - Configuração da VM para Orbit Stack
-- `setup-alpine.sh` - Script de instalação e configuração
-- `docker-compose-alpine.yml` - Alternativa Docker para Alpine
+Especificação completa do sistema (arquitetura, modelo de dados, API, RAG, build): [SPEC.md](SPEC.md). Plano de MVP priorizado: [ROADMAP.md](ROADMAP.md).
 
-## Instruções
+## Estrutura
 
-### 1. Criar a VM no Orbit Stack
-
-```bash
-# Usando o arquivo de configuração
-orbit create skywrite-vm.yml
-
-# Ou criar manualmente:
-orbit vm create skywrite \
-  --image alpine:latest \
-  --memory 2048 \
-  --cpu 2 \
-  --disk 20
+```
+client/   SPA React + Vite + Tailwind (UI, editor, paginas)
+server/   API Express + Prisma + auth JWT
 ```
 
-### 2. Executar o script de configuração
+## Requisitos
+
+- Bun
+- PostgreSQL local (banco `skywrite`)
+
+## Setup
 
 ```bash
-# Copiar o script para a VM
-orbit scp setup-alpine.sh skywrite:/tmp/
+bun install
 
-# Executar o script
-orbit ssh skywrite "chmod +x /tmp/setup-alpine.sh && sudo /tmp/setup-alpine.sh"
+createdb skywrite
+bun run db:migrate
+bun run db:seed
 ```
 
-### 3. Acessar a aplicação
+Configure `server/.env`:
 
-Após a configuração, acesse:
-- **Aplicação**: http://localhost:3002
-- **Banco de dados**: PostgreSQL localhost:5432
-- **Redis**: localhost:6379
+```
+DATABASE_URL="postgresql://USER@localhost:5432/skywrite?schema=public"
+JWT_SECRET="troque-isto"
+PORT=4000
+CLIENT_ORIGIN="http://localhost:5175"
+```
 
-## Serviços Configurados
-
-- **Node.js 20+** - Runtime JavaScript
-- **PostgreSQL** - Banco de dados principal
-- **Redis** - Cache e filas
-- **Chromium** - Para Puppeteer/geração de PDF
-- **Skywrite** - Aplicação Next.js
-
-## Portas
-
-- 3002 - Next.js Application
-- 5434 - PostgreSQL (mapeada para 5432 interna)
-- 6379 - Redis
-
-## Desenvolvimento
-
-Para desenvolvimento com hot reload:
+## Rodar
 
 ```bash
-# Acessar a VM
-orbit ssh skywrite
-
-# Navegar para o projeto
-cd /home/skywrite/skywrite
-
-# Iniciar em modo desenvolvimento
-npm run dev
+bun run dev
 ```
 
-## Gerenciamento dos Serviços
+- Client: http://localhost:5175 (proxia `/api` para o server)
+- Server: http://localhost:4000
 
-```bash
-# Ver status dos serviços
-rc-status
+Credenciais demo: `demo@thesis.writer` / `demo123`
 
-# Reiniciar aplicação
-rc-service skywrite restart
+## Scripts
 
-# Ver logs
-tail -f /var/log/skywrite.log
-```
+| Comando | Acao |
+| --- | --- |
+| `bun run dev` | Sobe client e server juntos |
+| `bun run dev:client` | So o front |
+| `bun run dev:server` | So a API |
+| `bun run build` | Build de producao do client |
+| `bun run db:migrate` | Aplica migrations |
+| `bun run db:seed` | Popula dados demo |
+| `bun run test` | Testes do server (unit + API) |
+| `bun run test:e2e` | Testes E2E do client (precisa do `bun run dev` ativo) |
+
+## Testes
+
+- **Server** (`cd server && bun test`): unit (`paper-ingest`, `thesis-analysis`) + integração de todas as rotas (auth, projects, files, templates, analyze, build, research) subindo o app em processo. Precisa do Postgres seedado. Rotas que dependem do ai-gateway passam tanto com ele ligado (200) quanto desligado (502 tratado).
+- **Client** (`cd client && bun run test:e2e`): Playwright cobre landing, login, editor (abas + file tree) e o live preview do markdown. Precisa de `bun run dev` rodando (client 5175, server 4000).
