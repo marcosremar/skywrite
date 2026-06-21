@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
+import { apiFetch } from "@/lib/apiFetch";
 import { FileTree } from "./FileTree";
 import { MarkdownEditor, MarkdownEditorRef } from "./MarkdownEditor";
 import { EditorToolbar } from "./EditorToolbar";
@@ -100,6 +102,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   );
   const [content, setContent] = useState(selectedFile?.content || "");
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<"preview" | "advisor">("preview");
@@ -143,37 +146,92 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   }, [content]);
 
   const handleFileSelect = useCallback((file: ProjectFile) => {
-    // Force complete unmount by clearing first, then set new file
+    const current = latestRef.current;
+    if (current.file && current.content !== current.file.content) {
+      flushSave();
+    }
     setSelectedFile(null);
     setContent("");
-    // Use requestAnimationFrame to ensure unmount happens before remount
     requestAnimationFrame(() => {
+      const draft = localStorage.getItem(`skywrite-draft:${project.id}:${file.path}`);
       setSelectedFile(file);
-      setContent(file.content || "");
+      if (draft != null && draft !== (file.content || "")) {
+        setContent(draft);
+        toast.info("Rascunho local restaurado");
+      } else {
+        setContent(file.content || "");
+      }
     });
-  }, []);
+  }, [project.id]);
+
+  const draftKey = (filePath: string) => `skywrite-draft:${project.id}:${filePath}`;
+
+  const latestRef = useRef<{ file: ProjectFile | null; content: string }>({
+    file: selectedFile,
+    content,
+  });
+  latestRef.current = { file: selectedFile, content };
+
+  const flushSave = useCallback(() => {
+    const { file, content: text } = latestRef.current;
+    if (!file || text === file.content) return;
+    apiFetch(`/api/projects/${project.id}/files/${file.path}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: text }),
+    })
+      .then((res) => {
+        if (!res.ok) localStorage.setItem(draftKey(file.path), text);
+      })
+      .catch(() => localStorage.setItem(draftKey(file.path), text));
+  }, [project.id]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      const { file, content: text } = latestRef.current;
+      if (file && text !== file.content) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => {
+      window.removeEventListener("beforeunload", handler);
+      flushSave();
+    };
+  }, [flushSave]);
 
   const handleSave = async () => {
     if (!selectedFile) return;
+    const file = selectedFile;
+    const snapshot = content;
 
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/projects/${project.id}/files/${selectedFile.path}`, {
+      const response = await apiFetch(`/api/projects/${project.id}/files/${file.path}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content: snapshot }),
       });
       if (response.ok) {
+        setSaveError(false);
         setLastSaved(new Date());
-        // Update local file state
-        setFiles(prev => prev.map(f =>
-          f.id === selectedFile.id ? { ...f, content } : f
-        ));
+        setFiles((prev) => prev.map((f) => (f.id === file.id ? { ...f, content: snapshot } : f)));
+        setSelectedFile((prev) => (prev?.id === file.id ? { ...prev, content: snapshot } : prev));
+        localStorage.removeItem(draftKey(file.path));
       } else {
-        console.error("Save failed:", response.status);
+        setSaveError(true);
+        localStorage.setItem(draftKey(file.path), snapshot);
+        toast.error(
+          response.status === 401
+            ? "Sessão expirada — rascunho salvo localmente"
+            : "Erro ao salvar"
+        );
       }
-    } catch (error) {
-      console.error("Error saving:", error);
+    } catch {
+      setSaveError(true);
+      localStorage.setItem(draftKey(file.path), snapshot);
+      toast.error("Falha de conexão ao salvar — rascunho salvo localmente");
     } finally {
       setIsSaving(false);
     }
@@ -185,7 +243,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
     setIsBuilding(true);
     setBuildError(null);
     try {
-      const response = await fetch(`/api/projects/${project.id}/build`, {
+      const response = await apiFetch(`/api/projects/${project.id}/build`, {
         method: "POST",
       });
       const data = await response.json();
@@ -205,7 +263,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   const handleSaveMetadata = async () => {
     setSavingMetadata(true);
     try {
-      await fetch(`/api/projects/${project.id}`, {
+      await apiFetch(`/api/projects/${project.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(metadata),
@@ -224,7 +282,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
     });
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
     const filePath = `media/${safeName}`;
-    const response = await fetch(`/api/projects/${project.id}/files`, {
+    const response = await apiFetch(`/api/projects/${project.id}/files`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: filePath, content: base64, type: "IMAGE" }),
@@ -239,7 +297,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
     if (!bibFile) return;
 
     try {
-      const response = await fetch(`/api/projects/${project.id}/files/${bibFile.path}`, {
+      const response = await apiFetch(`/api/projects/${project.id}/files/${bibFile.path}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: newBibContent }),
@@ -410,11 +468,19 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                 {/* Right: Actions */}
                 <div className="flex items-center gap-1">
                   {/* Save status */}
-                  {lastSaved && (
-                    <span className="text-xs text-muted-foreground mr-2 hidden sm:inline">
-                      Salvo {lastSaved.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  )}
+                  <span className="text-xs mr-2 hidden sm:inline">
+                    {isSaving ? (
+                      <span className="text-muted-foreground">Salvando…</span>
+                    ) : saveError ? (
+                      <span className="text-destructive">Erro ao salvar</span>
+                    ) : selectedFile && content !== selectedFile.content ? (
+                      <span className="text-muted-foreground">Não salvo</span>
+                    ) : lastSaved ? (
+                      <span className="text-muted-foreground">
+                        Salvo {lastSaved.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    ) : null}
+                  </span>
 
                   <Button
                     variant="ghost"

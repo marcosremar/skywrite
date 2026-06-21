@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 import { cn } from "@/lib/utils";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -881,7 +882,7 @@ function ChatInterface({
     setLoading(true);
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/research`, {
+      const res = await apiFetch(`/api/projects/${projectId}/research`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question, content, fileName }),

@@ -107,7 +107,6 @@ export default function Projects() {
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <button
-                    onClick={(e) => e.preventDefault()}
                     title="Excluir projeto"
                     className="absolute top-2 right-2 z-10 rounded-md bg-background/80 p-1.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive transition"
                   >

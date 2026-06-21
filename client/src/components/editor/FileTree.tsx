@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -182,7 +183,7 @@ export function FileTree({
       parts[parts.length - 1] = newName;
       const newPath = parts.join("/");
 
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/projects/${projectId}/files/rename`,
         {
           method: "POST",
@@ -213,7 +214,7 @@ export function FileTree({
     if (!fileToDelete) return;
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/projects/${projectId}/files/${encodeURIComponent(fileToDelete.path)}`,
         {
           method: "DELETE",
@@ -243,7 +244,7 @@ export function FileTree({
       parts.push(newFileName);
       const newPath = parts.join("/");
 
-      const response = await fetch(`/api/projects/${projectId}/files`, {
+      const response = await apiFetch(`/api/projects/${projectId}/files`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -273,7 +274,7 @@ export function FileTree({
       : newFileNameInput;
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/files`, {
+      const response = await apiFetch(`/api/projects/${projectId}/files`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

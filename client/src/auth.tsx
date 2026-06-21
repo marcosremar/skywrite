@@ -5,6 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { setUnauthorizedHandler } from "./lib/apiFetch";
 
 interface User {
   id: string;
@@ -42,6 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((data) => setUser(data?.user ?? null))
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => setUser(null));
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const login = async (email: string, password: string) => {
