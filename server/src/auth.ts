@@ -19,7 +19,11 @@ export function setAuthCookie(res: Response, token: string) {
 }
 
 export function clearAuthCookie(res: Response) {
-  res.clearCookie(TOKEN_COOKIE);
+  res.clearCookie(TOKEN_COOKIE, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
 }
 
 function readUserId(req: Request): string | null {

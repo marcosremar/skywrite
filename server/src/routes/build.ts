@@ -5,6 +5,8 @@ import { tmpdir } from "os";
 import * as path from "path";
 import { db } from "../db.js";
 import { requireAuth } from "../auth.js";
+import { heavyLimiter } from "../lib/rate-limit.js";
+import { isSafeRelPath } from "../lib/safe-path.js";
 
 export const buildRouter = Router({ mergeParams: true });
 
@@ -23,7 +25,7 @@ interface BuildResult {
   error?: string;
 }
 
-buildRouter.post("/", async (req, res) => {
+buildRouter.post("/", heavyLimiter, async (req, res) => {
   try {
     const { id } = req.params as { id: string };
 
@@ -33,6 +35,13 @@ buildRouter.post("/", async (req, res) => {
     });
     if (!project) {
       return res.status(404).json({ error: "Project not found" });
+    }
+
+    const inFlight = await db.build.findFirst({
+      where: { projectId: id, status: { in: ["QUEUED", "PROCESSING"] } },
+    });
+    if (inFlight) {
+      return res.status(409).json({ error: "Já existe um build em andamento para este projeto" });
     }
 
     const build = await db.build.create({
@@ -141,6 +150,7 @@ async function runPandocBuild(files: BuildFile[]): Promise<BuildResult> {
   const dir = await mkdtemp(path.join(tmpdir(), "skywrite-build-"));
   try {
     for (const file of files) {
+      if (!isSafeRelPath(file.path)) continue;
       const filePath = path.join(dir, file.path);
       await mkdir(path.dirname(filePath), { recursive: true });
       if (file.type === "IMAGE") {

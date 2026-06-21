@@ -63,6 +63,9 @@ Base: `/api`. Respostas JSON. Rotas marcadas com 🔒 exigem cookie de auth.
 | POST | `/api/auth/login` | Valida credenciais, seta cookie. 401 se inválido. |
 | POST | `/api/auth/logout` | Limpa cookie. |
 | GET | `/api/auth/me` 🔒 | Usuário atual. |
+| DELETE | `/api/auth/me` 🔒 | Exclui a conta e todos os dados (LGPD). |
+
+`/api/auth/register` e `/api/auth/login` têm rate-limit; e-mail é normalizado e validado, `name` é obrigatório.
 
 ### Projects & Files
 | Método | Rota | Descrição |
@@ -70,6 +73,8 @@ Base: `/api`. Respostas JSON. Rotas marcadas com 🔒 exigem cookie de auth.
 | GET | `/api/projects` 🔒 | Lista projetos do usuário (com `_count` de files/builds). |
 | POST | `/api/projects` 🔒 | Cria projeto (de template ou arquivos default). |
 | GET | `/api/projects/:id` 🔒 | Projeto + arquivos (ordenados por path). |
+| PATCH | `/api/projects/:id` 🔒 | Atualiza metadados (name/title/subtitle/author/university/language). |
+| DELETE | `/api/projects/:id` 🔒 | Exclui projeto (cascade em files/builds). |
 | POST | `/api/projects/:id/files` 🔒 | Cria arquivo. |
 | GET | `/api/projects/:id/files/*` 🔒 | Lê arquivo pelo path (wildcard). |
 | PUT | `/api/projects/:id/files/*` 🔒 | Atualiza conteúdo. |
@@ -86,8 +91,9 @@ Base: `/api`. Respostas JSON. Rotas marcadas com 🔒 exigem cookie de auth.
 | Método | Rota | Descrição |
 | --- | --- | --- |
 | POST | `/api/projects/:id/analyze` 🔒 | Análise local (regras) dos `.md` → `{ analysis: { overallScore, sections, citations } }`. |
-| GET | `/api/projects/:id/build` 🔒 | Últimos builds. |
-| POST | `/api/projects/:id/build` 🔒 | Gera PDF (pandoc→tectonic), retorna `pdfUrl` (data URL base64). |
+| GET | `/api/projects/:id/build` 🔒 | Últimos builds (sem o PDF). |
+| POST | `/api/projects/:id/build` 🔒 | Gera PDF (pandoc→tectonic); rate-limit + 409 se já há build em andamento; retorna `pdfPath`. |
+| GET | `/api/projects/:id/build/:buildId/pdf` 🔒 | Serve o PDF (inline; `?download=1` para baixar). |
 | POST | `/api/projects/:id/research` 🔒 | Orientador Virtual (RAG). Ver §7. |
 
 ### Saúde

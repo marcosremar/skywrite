@@ -14,7 +14,7 @@ export default function Home() {
       <header className="border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-primary">Thesis Writer</span>
+            <span className="text-2xl font-bold text-primary">Skywrite</span>
           </div>
           <nav className="flex items-center gap-4">
             <Link to="/login">
@@ -143,79 +143,43 @@ export default function Home() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <span className="text-2xl">🌍</span> Multi-idioma
+                <span className="text-2xl">🤖</span> Orientador Virtual
               </CardTitle>
-              <CardDescription>Traducao automatica com IA.</CardDescription>
+              <CardDescription>Feedback com IA fundamentado em fontes reais.</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Escreva em portugues, exporte em frances ou ingles. Citacoes e
-                referencias preservadas.
+                Analise por secao, checklist de qualidade e um chat que busca
+                fontes academicas e verifica se suas afirmacoes tem suporte.
               </p>
             </CardContent>
           </Card>
         </div>
       </section>
 
-      <section className="container mx-auto px-4 py-24">
-        <h2 className="mb-12 text-center text-3xl font-bold text-foreground">
-          Precos Simples
+      <section className="container mx-auto px-4 py-24 text-center">
+        <h2 className="mb-4 text-3xl font-bold text-foreground">
+          Comece a escrever hoje
         </h2>
-        <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gratis</CardTitle>
-              <CardDescription>Para comecar</CardDescription>
-              <p className="text-4xl font-bold text-primary">R$0</p>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>1 projeto</li>
-                <li>10 builds/mes</li>
-                <li>100MB de armazenamento</li>
-                <li>Templates basicos</li>
-              </ul>
-              <Link to="/register" className="mt-6 block">
-                <Button className="w-full" variant="outline">
-                  Comecar Gratis
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary">
-            <CardHeader>
-              <CardTitle>Pro</CardTitle>
-              <CardDescription>Para quem leva a serio</CardDescription>
-              <p className="text-4xl font-bold text-primary">R$29/mes</p>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Projetos ilimitados</li>
-                <li>Builds ilimitados</li>
-                <li>10GB de armazenamento</li>
-                <li>Todos os templates</li>
-                <li>Traducao com IA</li>
-                <li>Suporte prioritario</li>
-              </ul>
-              <Link to="/register" className="mt-6 block">
-                <Button className="w-full">Assinar Pro</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
+        <p className="mx-auto mb-8 max-w-xl text-muted-foreground">
+          Crie sua conta gratuita e exporte sua primeira tese em PDF.
+        </p>
+        <Link to="/register">
+          <Button size="lg" className="h-12 px-8">
+            Criar conta gratis
+          </Button>
+        </Link>
       </section>
 
       <footer className="border-t border-border bg-card">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <p className="text-sm text-muted-foreground">
-              2025 Thesis Writer. Feito para academicos.
+              Skywrite. Feito para academicos.
             </p>
             <nav className="flex gap-4 text-sm text-muted-foreground">
-              <Link to="/" className="hover:text-primary">Termos</Link>
-              <Link to="/" className="hover:text-primary">Privacidade</Link>
-              <Link to="/" className="hover:text-primary">Documentacao</Link>
+              <Link to="/terms" className="hover:text-primary">Termos</Link>
+              <Link to="/privacy" className="hover:text-primary">Privacidade</Link>
             </nav>
           </div>
         </div>

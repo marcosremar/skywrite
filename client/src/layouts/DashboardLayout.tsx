@@ -33,7 +33,7 @@ export function DashboardLayout() {
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-6">
             <Link to="/projects" className="text-xl font-bold text-primary">
-              Thesis Writer
+              Skywrite
             </Link>
             <nav className="hidden md:flex items-center gap-4">
               <Link to="/projects">
@@ -65,10 +65,7 @@ export function DashboardLayout() {
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to="/projects">Configuracoes</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/projects">Plano</Link>
+                <Link to="/settings">Configuracoes</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout}>Sair</DropdownMenuItem>

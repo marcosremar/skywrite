@@ -31,7 +31,7 @@ async function deleteProject(page: Page, name: string) {
 
 test("landing page renders", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("Thesis Writer").first()).toBeVisible();
+  await expect(page.getByText("Skywrite").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Login" })).toBeVisible();
 });
 
@@ -64,6 +64,28 @@ test("delete a project from the list", async ({ page }) => {
   await login(page);
   await createProject(page, "E2E Delete Me");
   await deleteProject(page, "E2E Delete Me");
+});
+
+test("terms and privacy pages render", async ({ page }) => {
+  await page.goto("/terms");
+  await expect(page.getByRole("heading", { name: "Termos de Uso" })).toBeVisible();
+  await page.goto("/privacy");
+  await expect(page.getByRole("heading", { name: "Política de Privacidade" })).toBeVisible();
+});
+
+test("register and delete own account (LGPD)", async ({ page }) => {
+  const email = `e2e-acct-${Date.now()}@skywrite.test`;
+  await page.goto("/register");
+  await page.getByLabel("Nome").fill("E2E Conta");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Senha").fill("password123");
+  await page.getByRole("button", { name: "Criar conta" }).click();
+  await page.waitForURL("**/projects");
+
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "Excluir minha conta" }).click();
+  await page.getByRole("button", { name: "Excluir conta", exact: true }).click();
+  await page.waitForURL((url) => url.pathname === "/");
 });
 
 test("markdown live preview conceals syntax off the cursor line", async ({ page }) => {

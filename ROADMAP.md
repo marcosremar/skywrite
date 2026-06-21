@@ -2,7 +2,7 @@
 
 Plano derivado de uma auditoria multi-agente do código (6 dimensões + crítico de completude). Cada item cita evidência real (`arquivo:linha`). Para a especificação do sistema, ver [SPEC.md](SPEC.md).
 
-> ⚠️ **Urgente, fora dos marcos:** `git ls-files client/ server/` retorna **0** — todo o stack atual está **untracked**, e a árvore commitada ainda é o app Next.js antigo. Versionar é o primeiro item de M0.
+> **Status:** M0–M4 implementados e verificados (server 26 testes + 8 e2e Playwright, typecheck e build limpos, CI em `.github/workflows/ci.yml`). Os marcos abaixo descrevem o trabalho entregue; o restante segue em "Fora de escopo".
 
 ## Definição de MVP
 

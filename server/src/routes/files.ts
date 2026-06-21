@@ -2,6 +2,7 @@ import { Router, type Response } from "express";
 import { Prisma } from "@prisma/client";
 import { db } from "../db.js";
 import { requireAuth } from "../auth.js";
+import { isSafeRelPath } from "../lib/safe-path.js";
 
 export const filesRouter = Router({ mergeParams: true });
 
@@ -26,8 +27,8 @@ filesRouter.post("/", async (req, res) => {
     const { id } = req.params as { id: string };
     const { path, content, type } = req.body ?? {};
 
-    if (!path) {
-      return res.status(400).json({ error: "Path is required" });
+    if (!isSafeRelPath(path)) {
+      return res.status(400).json({ error: "Caminho de arquivo invalido" });
     }
 
     const project = await db.project.findFirst({
@@ -37,7 +38,7 @@ filesRouter.post("/", async (req, res) => {
       return res.status(404).json({ error: "Project not found" });
     }
 
-    const name = path.split("/").pop();
+    const name = path.split("/").pop() || path;
 
     const file = await db.projectFile.create({
       data: {
@@ -63,8 +64,8 @@ filesRouter.post("/rename", async (req, res) => {
     const { id } = req.params as { id: string };
     const { oldPath, newPath, updateReferences } = req.body ?? {};
 
-    if (!oldPath || !newPath) {
-      return res.status(400).json({ error: "Old path and new path are required" });
+    if (!isSafeRelPath(oldPath) || !isSafeRelPath(newPath)) {
+      return res.status(400).json({ error: "Caminho de arquivo invalido" });
     }
 
     const project = await db.project.findFirst({

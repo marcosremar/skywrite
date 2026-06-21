@@ -113,6 +113,26 @@ describe("auth", () => {
     const res = await api("GET", "/api/auth/me");
     expect(res.status).toBe(401);
   });
+
+  test("register rejects missing name", async () => {
+    const res = await api("POST", "/api/auth/register", {
+      body: { email: `noname-${Date.now()}@skywrite.test`, password: "password123" },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("account deletion removes the user", async () => {
+    const delEmail = `del-${Date.now()}@skywrite.test`;
+    const reg = await api("POST", "/api/auth/register", {
+      body: { name: "Del", email: delEmail, password: "password123" },
+    });
+    const del = await api("DELETE", "/api/auth/me", { cookie: reg.cookie });
+    expect(del.status).toBe(200);
+    const relogin = await api("POST", "/api/auth/login", {
+      body: { email: delEmail, password: "password123" },
+    });
+    expect(relogin.status).toBe(401);
+  });
 });
 
 describe("projects and files", () => {
@@ -181,6 +201,14 @@ describe("projects and files", () => {
     expect(del.status).toBe(200);
   });
 
+  test("rejects path traversal on file create", async () => {
+    const res = await api("POST", `/api/projects/${projectId}/files`, {
+      cookie,
+      body: { path: "../../etc/passwd", content: "x", type: "OTHER" },
+    });
+    expect(res.status).toBe(400);
+  });
+
   test("analyze returns structured analysis", async () => {
     const res = await api("POST", `/api/projects/${projectId}/analyze`, { cookie });
     expect(res.status).toBe(200);
@@ -234,4 +262,26 @@ describe("build (pandoc-dependent)", () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.json.builds)).toBe(true);
   });
+
+  test("generates a PDF when pandoc and tectonic are present", async () => {
+    const hasTools = Bun.which("pandoc") && Bun.which("tectonic");
+    if (!hasTools) {
+      console.log("skip: pandoc/tectonic ausentes");
+      return;
+    }
+    const cookie = await loginDemo();
+    const created = await api("POST", "/api/projects", {
+      cookie,
+      body: { name: "Build Test", language: "pt-BR" },
+    });
+    const projectId = created.json.project.id;
+    createdProjectIds.push(projectId);
+
+    const res = await api("POST", `/api/projects/${projectId}/build`, { cookie });
+    expect(res.status).toBe(200);
+    expect(res.json.pdfPath).toContain("/pdf");
+
+    const pdf = await api("GET", res.json.pdfPath, { cookie });
+    expect(pdf.status).toBe(200);
+  }, 180_000);
 });
