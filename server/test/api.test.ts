@@ -253,6 +253,41 @@ describe("research (gateway-dependent)", () => {
   }, 180_000);
 });
 
+describe("orientador features", () => {
+  let cookie = "";
+  let projectId = "";
+
+  beforeAll(async () => {
+    cookie = await loginDemo();
+    const created = await api("POST", "/api/projects", {
+      cookie,
+      body: { name: "Features Test", language: "pt-BR" },
+    });
+    projectId = created.json.project.id;
+    createdProjectIds.push(projectId);
+  });
+
+  test("citation check returns results array", async () => {
+    const res = await api("POST", `/api/projects/${projectId}/citations/check`, { cookie });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.json.results)).toBe(true);
+  }, 60_000);
+
+  test("suggest sources returns 200 or handled 502", async () => {
+    const res = await api("POST", `/api/projects/${projectId}/research/sources`, {
+      cookie,
+      body: { claim: "Gamificação aumenta a motivação no ensino" },
+    });
+    expect([200, 502]).toContain(res.status);
+  }, 90_000);
+
+  test("feedback report PDF when pandoc present", async () => {
+    if (!Bun.which("pandoc") || !Bun.which("tectonic")) return;
+    const res = await api("POST", `/api/projects/${projectId}/report`, { cookie });
+    expect(res.status).toBe(200);
+  }, 180_000);
+});
+
 describe("build (pandoc-dependent)", () => {
   test("list builds is 200", async () => {
     const cookie = await loginDemo();

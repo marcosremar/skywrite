@@ -61,6 +61,40 @@ export function AIAdvisor({
   const [analysis, setAnalysis] = useState<ThesisAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [citationLoading, setCitationLoading] = useState(false);
+  const [citations, setCitations] = useState<
+    Array<{ key: string; title: string; status: string; matchedTitle?: string; doi?: string }> | null
+  >(null);
+
+  const handleReport = async () => {
+    if (!projectId) return;
+    setReportLoading(true);
+    try {
+      const res = await apiFetch(`/api/projects/${projectId}/report`, { method: "POST" });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "relatorio.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleCheckCitations = async () => {
+    if (!projectId) return;
+    setCitationLoading(true);
+    try {
+      const res = await apiFetch(`/api/projects/${projectId}/citations/check`, { method: "POST" });
+      if (res.ok) setCitations((await res.json()).results || []);
+    } finally {
+      setCitationLoading(false);
+    }
+  };
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastContentRef = useRef<string>("");
 
@@ -219,6 +253,44 @@ export function AIAdvisor({
         <ScrollArea className="flex-1">
           {/* Overview Tab */}
           <TabsContent value="overview" className="p-4 m-0">
+            {projectId && (
+              <div className="mb-4 space-y-3">
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleReport} disabled={reportLoading} className="flex-1 text-xs">
+                    {reportLoading ? "Gerando…" : "Baixar relatório (PDF)"}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleCheckCitations} disabled={citationLoading} className="flex-1 text-xs">
+                    {citationLoading ? "Verificando…" : "Verificar referências"}
+                  </Button>
+                </div>
+                {citations && (
+                  <div className="space-y-1.5 rounded-lg border border-border p-2">
+                    <p className="text-xs font-medium text-muted-foreground">Referências ({citations.length})</p>
+                    {citations.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Nenhuma referência no projeto.</p>
+                    ) : (
+                      citations.map((c) => (
+                        <div key={c.key} className="flex items-start gap-1.5 text-xs">
+                          <span
+                            className={cn(
+                              "text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap",
+                              c.status === "found"
+                                ? "bg-green-500/15 text-green-600 dark:text-green-400"
+                                : c.status === "mismatch"
+                                ? "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400"
+                                : "bg-destructive/15 text-destructive"
+                            )}
+                          >
+                            {c.status === "found" ? "encontrada" : c.status === "mismatch" ? "divergente" : "não encontrada"}
+                          </span>
+                          <span className="flex-1">{c.title || c.key}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             {!analysis && isAnalyzing ? (
               <AnalyzingState />
             ) : !analysis ? (
@@ -854,11 +926,28 @@ interface ChatSource {
   fullText?: boolean;
 }
 
+type VerdictClass = "supported" | "partial" | "unsupported" | "uncertain";
+
+interface ChatVerdict {
+  claim: string;
+  classification: VerdictClass;
+  evidence: string;
+  source: number | null;
+}
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   sources?: ChatSource[];
+  verdicts?: ChatVerdict[];
 }
+
+const VERDICT_STYLE: Record<VerdictClass, { label: string; cls: string }> = {
+  supported: { label: "Suportada", cls: "bg-green-500/15 text-green-600 dark:text-green-400" },
+  partial: { label: "Parcial", cls: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400" },
+  unsupported: { label: "Não suportada", cls: "bg-destructive/15 text-destructive" },
+  uncertain: { label: "Incerta", cls: "bg-muted text-muted-foreground" },
+};
 
 function ChatInterface({
   projectId,
@@ -872,6 +961,29 @@ function ChatInterface({
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const handleSuggestSources = async (claim: string) => {
+    if (!projectId || loading) return;
+    setLoading(true);
+    try {
+      const res = await apiFetch(`/api/projects/${projectId}/research/sources`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claim }),
+      });
+      const data = await res.json();
+      setMessages((prev) => [
+        ...prev,
+        res.ok
+          ? { role: "assistant", content: `Fontes sugeridas para: "${claim}"`, sources: data.sources }
+          : { role: "assistant", content: data.error || "Erro ao buscar fontes." },
+      ]);
+    } catch {
+      setMessages((prev) => [...prev, { role: "assistant", content: "Falha ao buscar fontes." }]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSend = async () => {
     const question = message.trim();
@@ -891,7 +1003,7 @@ function ChatInterface({
       setMessages((prev) => [
         ...prev,
         res.ok
-          ? { role: "assistant", content: data.answer, sources: data.sources }
+          ? { role: "assistant", content: data.answer, sources: data.sources, verdicts: data.verdicts }
           : { role: "assistant", content: data.error || "Erro ao consultar o orientador." },
       ]);
     } catch {
@@ -946,6 +1058,35 @@ function ChatInterface({
                 )}
               >
                 <div className="whitespace-pre-wrap">{msg.content}</div>
+                {msg.verdicts && msg.verdicts.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Verificação das afirmações</p>
+                    {msg.verdicts.map((v, j) => (
+                      <div key={j} className="text-xs">
+                        <div className="flex items-start gap-1.5">
+                          <span className={cn("text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap", VERDICT_STYLE[v.classification].cls)}>
+                            {VERDICT_STYLE[v.classification].label}
+                          </span>
+                          <span className="flex-1">{v.claim}</span>
+                        </div>
+                        {v.evidence && (
+                          <p className="mt-1 ml-1 border-l-2 border-border pl-2 text-muted-foreground italic">
+                            “{v.evidence}”{v.source ? ` [${v.source}]` : ""}
+                          </p>
+                        )}
+                        {(v.classification === "unsupported" || v.classification === "uncertain") && (
+                          <button
+                            onClick={() => handleSuggestSources(v.claim)}
+                            disabled={loading}
+                            className="mt-1 ml-1 text-[11px] text-primary hover:underline"
+                          >
+                            Buscar fontes para esta afirmação
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-border space-y-2">
                     <p className="text-xs font-medium text-muted-foreground">Fontes</p>

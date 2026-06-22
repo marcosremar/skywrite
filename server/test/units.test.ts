@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { resolvePdfUrl, htmlToText, relevantExcerpts } from "../src/lib/paper-ingest.js";
 import { analyzeThesis } from "../src/lib/thesis-analysis.js";
+import { parseBibTeX } from "../src/lib/bibtex.js";
+import { parseResearchResponse } from "../src/routes/research.js";
 
 describe("resolvePdfUrl", () => {
   test("converts arxiv abs to pdf", () => {
@@ -32,6 +34,53 @@ describe("relevantExcerpts", () => {
     const content = "conteudo sem termos relevantes aqui";
     const out = relevantExcerpts(content, "zzzz", 20);
     expect(out.length).toBeLessThanOrEqual(20);
+  });
+});
+
+describe("parseBibTeX", () => {
+  test("extracts key, title, doi from entries", () => {
+    const bib = `@article{krashen1984,
+  title = {The Input Hypothesis},
+  author = {Krashen, Stephen},
+  doi = {10.2307/3586393},
+  year = {1984}
+}
+@book{exemplo,
+  title = {Outro Titulo},
+  year = {2020}
+}`;
+    const entries = parseBibTeX(bib);
+    expect(entries.length).toBe(2);
+    expect(entries[0].key).toBe("krashen1984");
+    expect(entries[0].title).toBe("The Input Hypothesis");
+    expect(entries[0].doi).toBe("10.2307/3586393");
+    expect(entries[1].type).toBe("book");
+  });
+});
+
+describe("parseResearchResponse", () => {
+  test("parses valid JSON object", () => {
+    const raw = JSON.stringify({
+      answer: "resposta",
+      verdicts: [{ claim: "X", classification: "supported", evidence: "trecho", source: 1 }],
+    });
+    const out = parseResearchResponse(raw);
+    expect(out.answer).toBe("resposta");
+    expect(out.verdicts).toHaveLength(1);
+    expect(out.verdicts[0].classification).toBe("supported");
+  });
+  test("strips code fences", () => {
+    const raw = '```json\n{"answer":"oi","verdicts":[]}\n```';
+    expect(parseResearchResponse(raw).answer).toBe("oi");
+  });
+  test("coerces invalid classification to uncertain", () => {
+    const raw = '{"answer":"a","verdicts":[{"claim":"c","classification":"bogus"}]}';
+    expect(parseResearchResponse(raw).verdicts[0].classification).toBe("uncertain");
+  });
+  test("falls back to raw text when not JSON", () => {
+    const out = parseResearchResponse("texto solto");
+    expect(out.answer).toBe("texto solto");
+    expect(out.verdicts).toEqual([]);
   });
 });
 

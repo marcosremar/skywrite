@@ -88,6 +88,14 @@ test("register and delete own account (LGPD)", async ({ page }) => {
   await page.waitForURL((url) => url.pathname === "/");
 });
 
+test("citation check against Crossref shows status badges", async ({ page }) => {
+  await login(page);
+  await openDemoProject(page);
+  await page.getByRole("tab", { name: "Orientador Virtual" }).click();
+  await page.getByRole("button", { name: "Verificar referências" }).click();
+  await expect(page.getByText(/encontrada|não encontrada|divergente/).first()).toBeVisible({ timeout: 30000 });
+});
+
 test("markdown live preview conceals syntax off the cursor line", async ({ page }) => {
   await login(page);
   await openDemoProject(page);
