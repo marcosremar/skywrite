@@ -94,7 +94,10 @@ Base: `/api`. Respostas JSON. Rotas marcadas com 🔒 exigem cookie de auth.
 | GET | `/api/projects/:id/build` 🔒 | Últimos builds (sem o PDF). |
 | POST | `/api/projects/:id/build` 🔒 | Gera PDF (pandoc→tectonic); rate-limit + 409 se já há build em andamento; retorna `pdfPath`. |
 | GET | `/api/projects/:id/build/:buildId/pdf` 🔒 | Serve o PDF (inline; `?download=1` para baixar). |
-| POST | `/api/projects/:id/research` 🔒 | Orientador Virtual (RAG). Ver §7. |
+| POST | `/api/projects/:id/research` 🔒 | Orientador Virtual (RAG). Retorna `{ answer, verdicts[], sources }`; verdicts em 4 classes (supported/partial/unsupported/uncertain) + trecho. Ver §7. |
+| POST | `/api/projects/:id/research/sources` 🔒 | Sugere fontes acadêmicas para uma afirmação (`{ claim }`). |
+| POST | `/api/projects/:id/citations/check` 🔒 | Verifica existência das referências do `.bib` no Crossref (found/mismatch/not-found). |
+| POST | `/api/projects/:id/report` 🔒 | Gera PDF do relatório de feedback (análise por seção) e retorna o binário. |
 
 ### Saúde
 | Método | Rota | Descrição |
