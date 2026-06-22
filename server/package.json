@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "eval:citations": "bun eval/citation-benchmark.ts",
+    "eval:citations-meta": "bun eval/citation-metadata-check.ts",
     "eval:verdicts": "bun eval/verdict-benchmark.ts"
   },
   "prisma": {

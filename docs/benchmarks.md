@@ -47,10 +47,26 @@ Dataset: 20 pares {afirmação, trecho de fonte} rotulados nas 4 classes (suppor
 - **F2 — modelo de verificação configurável** (`AI_GATEWAY_VERIFY_MODEL`): o gateway atual só roteia `llama-3.3-70b`; quando houver um modelo mais forte, troca-se por env e re-mede com `eval:verdicts`.
 - **F2 — self-consistency (3 votos) testada e descartada:** deu 70% (vs 75% single-pass). Os erros do classificador são **viés sistemático, não ruído aleatório** — votar não corrige e não compensa o custo 3×. Decisão por dados: não shippar.
 
+## Cobertura (rodada 3)
+
+**F1 ampliado para 80 casos** (40 reais multi-área: medicina, psicologia, educação, economia, linguística + 40 fabricadas):
+- **Falso-positivo: 0%** (40/40 fabricadas pegas) — a garantia anti-alucinação aguenta em escala e fora de CS.
+- Recall (só título): 70% — pessimista, porque busca só por título soterra papers famosos sob derivados.
+
+**Maior lever de recall: autor+ano** (que o `.bib` real sempre tem). Medido em 12 papers difíceis (`eval:citations-meta`):
+| Busca | Confirmados |
+| --- | --- |
+| só título | 4/12 |
+| **título + autor + ano** | **10/12** |
+A busca agora usa título+autor+ano (Crossref `query.bibliographic` + fallbacks) e rows=8. O 0% de FP é preservado: metadados só melhoram o *ranking*; o match de título continua sendo o filtro de aceitação. Limite residual: alguns papers (ex.: BERT canônico) estão mal-indexados nos índices abertos — "não encontrada" = "não confirmada", nunca "fabricada".
+
+**Cobertura de código:** ~87% de linhas (`bun test --coverage`); 37 testes server.
+
 ## Como rodar
 ```bash
 cd server
-bun run eval:citations          # 50 casos, ~rede (Crossref/OpenAlex/Semantic Scholar)
+bun run eval:citations          # 80 casos, ~rede (Crossref/OpenAlex/Semantic Scholar)
+bun run eval:citations-meta     # ganho de autor+ano (12 papers difíceis)
 bun run eval:verdicts           # 20 casos, precisa do ai-gateway (LLM)
 VOTES=3 bun run eval:verdicts    # variante self-consistency (não recomendada)
 ```

@@ -172,6 +172,38 @@ describe("projects and files", () => {
     expect(res.json.projects.some((p: any) => p.id === projectId)).toBe(true);
   });
 
+  test("patch project metadata", async () => {
+    const res = await api("PATCH", `/api/projects/${projectId}`, {
+      cookie,
+      body: { author: "Marcos", title: "Título Novo" },
+    });
+    expect(res.status).toBe(200);
+    expect(res.json.project.author).toBe("Marcos");
+    expect(res.json.project.title).toBe("Título Novo");
+  });
+
+  test("patch unknown project is 404", async () => {
+    const res = await api("PATCH", "/api/projects/nao-existe-xyz", {
+      cookie,
+      body: { title: "x" },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test("delete project cascades and then 404s", async () => {
+    const created = await api("POST", "/api/projects", {
+      cookie,
+      body: { name: "Para Excluir", language: "pt-BR" },
+    });
+    const id = created.json.project.id;
+    const del = await api("DELETE", `/api/projects/${id}`, { cookie });
+    expect(del.status).toBe(200);
+    const get = await api("GET", `/api/projects/${id}`, { cookie });
+    expect(get.status).toBe(404);
+    const delAgain = await api("DELETE", `/api/projects/${id}`, { cookie });
+    expect(delAgain.status).toBe(404);
+  });
+
   test("file create, read, update, rename, delete", async () => {
     const create = await api("POST", `/api/projects/${projectId}/files`, {
       cookie,

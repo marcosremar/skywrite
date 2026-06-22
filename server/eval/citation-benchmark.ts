@@ -38,7 +38,7 @@ const total = rows.length;
 
 const pct = (n: number, d: number) => (d ? ((100 * n) / d).toFixed(1) : "0.0");
 
-console.log("\n=== BENCHMARK: verificação de referência (Crossref) — 50 casos ===\n");
+console.log(`\n=== BENCHMARK: verificação de referência (Crossref) — ${total} casos ===\n`);
 console.log(`Total: ${total} | reais: ${tp + fn} | fabricadas: ${tn + fp}`);
 console.log(`Acurácia geral:        ${pct(tp + tn, total)}%  (${tp + tn}/${total})`);
 console.log(`Recall (reais achadas): ${pct(tp, tp + fn)}%  (${tp}/${tp + fn})`);

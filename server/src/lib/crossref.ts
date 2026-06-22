@@ -41,18 +41,28 @@ function titlesMatch(a: string, b: string): boolean {
   return union > 0 && inter / union >= 0.7;
 }
 
-async function openAlexByTitle(title: string): Promise<{ matchedTitle: string; doi?: string } | null> {
+function authorSurname(author?: string): string {
+  if (!author) return "";
+  const first = author.split(/\s+and\s+|;/i)[0].trim();
+  return first.includes(",") ? first.split(",")[0].trim() : first.split(/\s+/).pop() || "";
+}
+
+function searchString(entry: BibEntry): string {
+  return [entry.title, authorSurname(entry.author), entry.year].filter(Boolean).join(" ");
+}
+
+async function openAlexByTitle(title: string, query: string): Promise<{ matchedTitle: string; doi?: string } | null> {
   const data = await fetchJson(
-    `https://api.openalex.org/works?search=${encodeURIComponent(title)}&per-page=5&select=title,doi&mailto=${MAILTO}`
+    `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=8&select=title,doi&mailto=${MAILTO}`
   );
   const items: Array<{ title?: string; doi?: string }> = data?.results ?? [];
   const match = items.find((it) => it.title && titlesMatch(title, it.title));
   return match?.title ? { matchedTitle: match.title, doi: match.doi || undefined } : null;
 }
 
-async function semanticScholarByTitle(title: string): Promise<{ matchedTitle: string; doi?: string } | null> {
+async function semanticScholarByTitle(title: string, query: string): Promise<{ matchedTitle: string; doi?: string } | null> {
   const data = await fetchJson(
-    `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(title)}&limit=5&fields=title,externalIds`
+    `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=8&fields=title,externalIds`
   );
   const items: Array<{ title?: string; externalIds?: { DOI?: string } }> = data?.data ?? [];
   const match = items.find((it) => it.title && titlesMatch(title, it.title));
@@ -102,8 +112,9 @@ export async function checkCitation(entry: BibEntry): Promise<CitationCheck> {
     return { key: entry.key, title, status: doiFailed ? "mismatch" : "unchecked" };
   }
 
+  const query = searchString(entry);
   const data = await fetchJson(
-    `${CROSSREF_BASE}?query.bibliographic=${encodeURIComponent(title)}&rows=5&select=title,DOI`
+    `${CROSSREF_BASE}?query.bibliographic=${encodeURIComponent(query)}&rows=8&select=title,DOI`
   );
   const items: Array<{ title?: string[]; DOI?: string }> = data?.message?.items ?? [];
   const match = items.find((it) => it.title?.[0] && titlesMatch(title, it.title[0]));
@@ -111,7 +122,7 @@ export async function checkCitation(entry: BibEntry): Promise<CitationCheck> {
     return { key: entry.key, title, matchedTitle: match.title![0], doi: match.DOI, status: doiFailed ? "mismatch" : "found" };
   }
 
-  const fallback = (await openAlexByTitle(title)) || (await semanticScholarByTitle(title));
+  const fallback = (await openAlexByTitle(title, query)) || (await semanticScholarByTitle(title, query));
   if (fallback) {
     return { key: entry.key, title, matchedTitle: fallback.matchedTitle, doi: fallback.doi, status: doiFailed ? "mismatch" : "found" };
   }
