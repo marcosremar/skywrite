@@ -1,0 +1,1 @@
+{"nodeId":"db5cbb87-39a1-462b-a327-cd243447d469","timestamp":1782086204697,"sessionId":"default","toolName":"navigate","argsSummary":{"url":"http://127.0.0.1:5173/web/index.html"},"resultStatus":"no_progress","progressStatus":"stuck","observationSummary":"Error creating tab: createTarget timed out after 60000ms","reward":-0.45}
