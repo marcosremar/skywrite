@@ -32,7 +32,13 @@ Classifique cada afirmação relevante:
 - "partial": a fonte sustenta PARTE da afirmação, ou a sustenta com ressalvas/condições.
 - "unsupported": a fonte CONTRADIZ ou NEGA a afirmação (diz o oposto ou que não há efeito).
 - "uncertain": a fonte NÃO ABORDA o tema da afirmação (é tangencial/irrelevante), então não dá para confirmar nem refutar.
-NÃO confunda "unsupported" (a fonte contradiz) com "uncertain" (a fonte não trata do assunto). Se não houver afirmações verificáveis, use verdicts vazio.`;
+NÃO confunda "unsupported" (a fonte contradiz) com "uncertain" (a fonte não trata do assunto). Se não houver afirmações verificáveis, use verdicts vazio.
+
+Exemplos de classificação:
+- Afirmação "vacinas reduzem a mortalidade infantil" + fonte "a campanha de vacinação reduziu a mortalidade infantil em 40% na região" => supported (a fonte afirma o efeito; não rebaixe para partial só por ser um estudo único).
+- Afirmação "o teletrabalho aumenta a produtividade" + fonte "houve ganho de produtividade em tarefas individuais, mas queda na colaboração em equipe" => partial.
+- Afirmação "dormir menos melhora o foco" + fonte "a privação de sono reduziu a atenção sustentada dos participantes" => unsupported (a fonte contradiz).
+- Afirmação "o café aumenta a criatividade" + fonte "o artigo mede o efeito do café sobre a pressão arterial, sem avaliar criatividade" => uncertain (a fonte não trata do tema).`;
 
 export type VerdictClass = "supported" | "partial" | "unsupported" | "uncertain";
 

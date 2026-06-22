@@ -50,6 +50,15 @@ async function openAlexByTitle(title: string): Promise<{ matchedTitle: string; d
   return match?.title ? { matchedTitle: match.title, doi: match.doi || undefined } : null;
 }
 
+async function semanticScholarByTitle(title: string): Promise<{ matchedTitle: string; doi?: string } | null> {
+  const data = await fetchJson(
+    `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(title)}&limit=5&fields=title,externalIds`
+  );
+  const items: Array<{ title?: string; externalIds?: { DOI?: string } }> = data?.data ?? [];
+  const match = items.find((it) => it.title && titlesMatch(title, it.title));
+  return match?.title ? { matchedTitle: match.title, doi: match.externalIds?.DOI } : null;
+}
+
 async function fetchJson(url: string, retries = 2): Promise<any | null> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -97,9 +106,9 @@ export async function checkCitation(entry: BibEntry): Promise<CitationCheck> {
     return { key: entry.key, title, matchedTitle: match.title![0], doi: match.DOI, status: "found" };
   }
 
-  const openAlex = await openAlexByTitle(title);
-  if (openAlex) {
-    return { key: entry.key, title, matchedTitle: openAlex.matchedTitle, doi: openAlex.doi, status: "found" };
+  const fallback = (await openAlexByTitle(title)) || (await semanticScholarByTitle(title));
+  if (fallback) {
+    return { key: entry.key, title, matchedTitle: fallback.matchedTitle, doi: fallback.doi, status: "found" };
   }
 
   const top = items[0]?.title?.[0];
