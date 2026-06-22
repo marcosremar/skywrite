@@ -21,13 +21,23 @@ ${c.source}
 </fonte>`;
 }
 
-async function classify(c: VerdictCase): Promise<Cls | "none"> {
+const VOTES = Number(process.env.VOTES) || 1;
+
+async function classifyOnce(c: VerdictCase): Promise<Cls | "none"> {
   const raw = await chat([
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: userMessage(c) },
   ]);
   const { verdicts } = parseResearchResponse(raw);
   return (verdicts[0]?.classification as Cls) ?? "none";
+}
+
+async function classify(c: VerdictCase): Promise<Cls | "none"> {
+  if (VOTES <= 1) return classifyOnce(c);
+  const votes = await Promise.all(Array.from({ length: VOTES }, () => classifyOnce(c).catch(() => "none" as const)));
+  const counts = new Map<string, number>();
+  for (const v of votes) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0] as Cls;
 }
 
 async function runChunked<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {

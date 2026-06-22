@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../db.js";
 import { requireAuth } from "../auth.js";
-import { chat, searchWeb, type SearchSource } from "../lib/ai-gateway.js";
+import { chat, searchWeb, VERIFY_MODEL, type SearchSource } from "../lib/ai-gateway.js";
 import { ingestSources, relevantExcerpts, type IngestedPaper } from "../lib/paper-ingest.js";
 import { heavyLimiter } from "../lib/rate-limit.js";
 
@@ -161,10 +161,13 @@ researchRouter.post("/", heavyLimiter, async (req, res) => {
     }
     const ingestedUrls = new Set(papers.map((p) => p.url));
 
-    const raw = await chat([
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: buildUserMessage(question, fileName || "", content || "", sources, papers) },
-    ]);
+    const raw = await chat(
+      [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: buildUserMessage(question, fileName || "", content || "", sources, papers) },
+      ],
+      VERIFY_MODEL
+    );
     const { answer, verdicts } = parseResearchResponse(raw);
 
     return res.json({

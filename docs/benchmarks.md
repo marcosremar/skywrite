@@ -40,9 +40,17 @@ Dataset: 20 pares {afirmação, trecho de fonte} rotulados nas 4 classes (suppor
 
 **Veredito:** bom o suficiente para um assistente (não um juiz automático). O erro é quase sempre de **uma classe adjacente** (95% tolerante) e a direção crítica — não afirmar suporte falso — está sólida (`unsupported` 6/6 e `supported` nunca vira `unsupported`). Viés residual: conservador (rebaixa "supported" para "partial"), o que é seguro.
 
+## Melhorias adicionais (rodada 2)
+
+- **F1 — validação profunda de DOI:** quando a entrada tem DOI, resolve o DOI e compara título+ano. Pega dois modos de alucinação que checkers de abstract não pegam: **DOI fabricado** (título existe, mas o DOI citado é inválido → `mismatch`) e **DOI aponta para outro trabalho** (→ `mismatch`). Verificado com 3 casos (válido→found, DOI fabricado→mismatch, título errado→mismatch).
+- **F1 — 3º índice Semantic Scholar** após Crossref/OpenAlex (mais cobertura de arXiv/conferência).
+- **F2 — modelo de verificação configurável** (`AI_GATEWAY_VERIFY_MODEL`): o gateway atual só roteia `llama-3.3-70b`; quando houver um modelo mais forte, troca-se por env e re-mede com `eval:verdicts`.
+- **F2 — self-consistency (3 votos) testada e descartada:** deu 70% (vs 75% single-pass). Os erros do classificador são **viés sistemático, não ruído aleatório** — votar não corrige e não compensa o custo 3×. Decisão por dados: não shippar.
+
 ## Como rodar
 ```bash
 cd server
-bun run eval:citations   # 50 casos, ~rede (Crossref/OpenAlex)
-bun run eval:verdicts    # 20 casos, precisa do ai-gateway (LLM)
+bun run eval:citations          # 50 casos, ~rede (Crossref/OpenAlex/Semantic Scholar)
+bun run eval:verdicts           # 20 casos, precisa do ai-gateway (LLM)
+VOTES=3 bun run eval:verdicts    # variante self-consistency (não recomendada)
 ```

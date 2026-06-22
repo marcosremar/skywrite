@@ -78,23 +78,28 @@ async function fetchJson(url: string, retries = 2): Promise<any | null> {
 
 export async function checkCitation(entry: BibEntry): Promise<CitationCheck> {
   const title = entry.title || "";
+  let doiFailed = false;
 
   if (entry.doi) {
     const data = await fetchJson(`${CROSSREF_BASE}/${encodeURIComponent(entry.doi)}`);
     const crTitle = data?.message?.title?.[0];
     if (crTitle) {
+      const crYear = data.message.issued?.["date-parts"]?.[0]?.[0];
+      const titleOk = !title || titlesMatch(title, crTitle);
+      const yearOk = !entry.year || !crYear || String(crYear) === String(entry.year);
       return {
         key: entry.key,
         title,
         doi: data.message.DOI,
         matchedTitle: crTitle,
-        status: !title || titlesMatch(title, crTitle) ? "found" : "mismatch",
+        status: titleOk && yearOk ? "found" : "mismatch",
       };
     }
+    doiFailed = true;
   }
 
   if (!title) {
-    return { key: entry.key, title, status: "unchecked" };
+    return { key: entry.key, title, status: doiFailed ? "mismatch" : "unchecked" };
   }
 
   const data = await fetchJson(
@@ -103,12 +108,12 @@ export async function checkCitation(entry: BibEntry): Promise<CitationCheck> {
   const items: Array<{ title?: string[]; DOI?: string }> = data?.message?.items ?? [];
   const match = items.find((it) => it.title?.[0] && titlesMatch(title, it.title[0]));
   if (match) {
-    return { key: entry.key, title, matchedTitle: match.title![0], doi: match.DOI, status: "found" };
+    return { key: entry.key, title, matchedTitle: match.title![0], doi: match.DOI, status: doiFailed ? "mismatch" : "found" };
   }
 
   const fallback = (await openAlexByTitle(title)) || (await semanticScholarByTitle(title));
   if (fallback) {
-    return { key: entry.key, title, matchedTitle: fallback.matchedTitle, doi: fallback.doi, status: "found" };
+    return { key: entry.key, title, matchedTitle: fallback.matchedTitle, doi: fallback.doi, status: doiFailed ? "mismatch" : "found" };
   }
 
   const top = items[0]?.title?.[0];

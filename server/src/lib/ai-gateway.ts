@@ -1,6 +1,7 @@
 const GATEWAY_URL = process.env.AI_GATEWAY_URL || "http://127.0.0.1:9012";
 const GATEWAY_KEY = process.env.AI_GATEWAY_KEY || "";
 const CHAT_MODEL = process.env.AI_GATEWAY_MODEL || "llama-3.3-70b-versatile";
+export const VERIFY_MODEL = process.env.AI_GATEWAY_VERIFY_MODEL || CHAT_MODEL;
 
 export interface SearchSource {
   title: string;
@@ -48,11 +49,11 @@ export async function searchWeb(query: string, maxResults = 6): Promise<SearchSo
   }));
 }
 
-export async function chat(messages: ChatMessage[]): Promise<string> {
+export async function chat(messages: ChatMessage[], model: string = CHAT_MODEL): Promise<string> {
   const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ model: CHAT_MODEL, messages, temperature: 0.3 }),
+    body: JSON.stringify({ model, messages, temperature: 0.3 }),
     signal: AbortSignal.timeout(60_000),
   });
   if (!res.ok) {
