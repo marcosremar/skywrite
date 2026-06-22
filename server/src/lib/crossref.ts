@@ -60,13 +60,23 @@ async function openAlexByTitle(title: string, query: string): Promise<{ matchedT
   return match?.title ? { matchedTitle: match.title, doi: match.doi || undefined } : null;
 }
 
-async function semanticScholarByTitle(title: string, query: string): Promise<{ matchedTitle: string; doi?: string } | null> {
+async function semanticScholarByTitle(title: string): Promise<{ matchedTitle: string; doi?: string } | null> {
   const data = await fetchJson(
-    `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=8&fields=title,externalIds`
+    `https://api.semanticscholar.org/graph/v1/paper/search/match?query=${encodeURIComponent(title)}&fields=title,externalIds`
   );
-  const items: Array<{ title?: string; externalIds?: { DOI?: string } }> = data?.data ?? [];
-  const match = items.find((it) => it.title && titlesMatch(title, it.title));
-  return match?.title ? { matchedTitle: match.title, doi: match.externalIds?.DOI } : null;
+  const best: { title?: string; externalIds?: { DOI?: string } } | undefined = data?.data?.[0];
+  return best?.title && titlesMatch(title, best.title)
+    ? { matchedTitle: best.title, doi: best.externalIds?.DOI }
+    : null;
+}
+
+async function dblpByTitle(title: string): Promise<{ matchedTitle: string; doi?: string } | null> {
+  const data = await fetchJson(
+    `https://dblp.org/search/publ/api?q=${encodeURIComponent(title)}&format=json&h=5`
+  );
+  const hits: Array<{ info?: { title?: string; doi?: string } }> = data?.result?.hits?.hit ?? [];
+  const match = hits.find((h) => h.info?.title && titlesMatch(title, h.info.title.replace(/\.$/, "")));
+  return match?.info?.title ? { matchedTitle: match.info.title.replace(/\.$/, ""), doi: match.info.doi } : null;
 }
 
 async function fetchJson(url: string, retries = 2): Promise<any | null> {
@@ -122,7 +132,10 @@ export async function checkCitation(entry: BibEntry): Promise<CitationCheck> {
     return { key: entry.key, title, matchedTitle: match.title![0], doi: match.DOI, status: doiFailed ? "mismatch" : "found" };
   }
 
-  const fallback = (await openAlexByTitle(title, query)) || (await semanticScholarByTitle(title, query));
+  const fallback =
+    (await openAlexByTitle(title, query)) ||
+    (await semanticScholarByTitle(title)) ||
+    (await dblpByTitle(title));
   if (fallback) {
     return { key: entry.key, title, matchedTitle: fallback.matchedTitle, doi: fallback.doi, status: doiFailed ? "mismatch" : "found" };
   }

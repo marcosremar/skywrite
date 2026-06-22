@@ -49,16 +49,22 @@ Dataset: 20 pares {afirmação, trecho de fonte} rotulados nas 4 classes (suppor
 
 ## Cobertura (rodada 3)
 
-**F1 ampliado para 80 casos** (40 reais multi-área: medicina, psicologia, educação, economia, linguística + 40 fabricadas):
-- **Falso-positivo: 0%** (40/40 fabricadas pegas) — a garantia anti-alucinação aguenta em escala e fora de CS.
-- Recall (só título): 70% — pessimista, porque busca só por título soterra papers famosos sob derivados.
+**F1 ampliado para 80 casos** (40 reais multi-área: medicina, psicologia, educação, economia, linguística + 40 fabricadas), após corrigir os limites de cobertura:
 
-**Maior lever de recall: autor+ano** (que o `.bib` real sempre tem). Medido em 12 papers difíceis (`eval:citations-meta`):
-| Busca | Confirmados |
-| --- | --- |
-| só título | 4/12 |
-| **título + autor + ano** | **10/12** |
-A busca agora usa título+autor+ano (Crossref `query.bibliographic` + fallbacks) e rows=8. O 0% de FP é preservado: metadados só melhoram o *ranking*; o match de título continua sendo o filtro de aceitação. Limite residual: alguns papers (ex.: BERT canônico) estão mal-indexados nos índices abertos — "não encontrada" = "não confirmada", nunca "fabricada".
+| Métrica (80 casos, só título) | Antes | Depois |
+| --- | --- | --- |
+| Acurácia | 82% | **95%** |
+| Recall | 65% | **90%** |
+| **Falso-positivo** | 0% | **0%** |
+
+**Correções de cobertura (APIs gratuitas):**
+1. **Semantic Scholar `/paper/search/match`** — o endpoint feito para casar título exato (em vez do `/search` amplo, que soterrava o paper canônico sob derivados). Achou BERT, Dropout, LDA, Lasso etc.
+2. **DBLP** (bibliografia de CS, sem rate-limit) como índice extra.
+3. **Busca com título+autor+ano** (que o `.bib` real tem) + rows=8.
+
+Crucial: os fallbacks `/match` e DBLP sempre retornam o "mais próximo", mas o **gate de título (Jaccard) segurou o 0% de falso-positivo** — nenhuma das 40 fabricadas foi aceita.
+
+`eval:citations-meta` (12 papers difíceis): só-título **4/12 → 11/12** (SS `/match`); com autor+ano **12/12**. Em produção (com metadados) o recall fica perto do teto. Limite residual: 4 títulos muito curtos/genéricos ("A power primer") sem metadados — com autor+ano resolvem.
 
 **Cobertura de código:** ~87% de linhas (`bun test --coverage`); 37 testes server.
 
