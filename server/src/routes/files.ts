@@ -104,7 +104,7 @@ filesRouter.post("/rename", async (req, res) => {
       for (const fileToUpdate of filesToUpdate) {
         let updatedContent = fileToUpdate.content || "";
         updatedContent = updatedContent.split(oldPath).join(newPath);
-        updatedContent = updatedContent.split(oldFileName).join(newFileName);
+        updatedContent = updatedContent.split(`](${oldFileName})`).join(`](${newFileName})`);
         await db.projectFile.update({
           where: { id: fileToUpdate.id },
           data: { content: updatedContent, updatedAt: new Date() },
@@ -124,6 +124,9 @@ filesRouter.get("/*", async (req, res) => {
   try {
     const { id } = req.params as { id: string };
     const filePath = (req.params as Record<string, string>)[0];
+    if (!isSafeRelPath(filePath)) {
+      return res.status(400).json({ error: "Caminho de arquivo invalido" });
+    }
 
     const file = await db.projectFile.findFirst({
       where: { projectId: id, path: filePath, project: { userId: req.userId } },
@@ -142,6 +145,9 @@ filesRouter.put("/*", async (req, res) => {
   try {
     const { id } = req.params as { id: string };
     const filePath = (req.params as Record<string, string>)[0];
+    if (!isSafeRelPath(filePath)) {
+      return res.status(400).json({ error: "Caminho de arquivo invalido" });
+    }
     const { content } = req.body ?? {};
 
     const project = await db.project.findFirst({
@@ -171,6 +177,9 @@ filesRouter.delete("/*", async (req, res) => {
   try {
     const { id } = req.params as { id: string };
     const filePath = (req.params as Record<string, string>)[0];
+    if (!isSafeRelPath(filePath)) {
+      return res.status(400).json({ error: "Caminho de arquivo invalido" });
+    }
 
     const project = await db.project.findFirst({
       where: { id, userId: req.userId },

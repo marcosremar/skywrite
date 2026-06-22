@@ -33,12 +33,16 @@ function titlesMatch(a: string, b: string): boolean {
   const wb = nb.split(" ");
   const shorter = wa.length <= wb.length ? na : nb;
   const longer = wa.length <= wb.length ? nb : na;
-  if (shorter.split(" ").length >= 4 && longer.includes(shorter)) return true;
+  if (shorter.split(" ").length >= 4 && Math.abs(wa.length - wb.length) <= 2 && longer.includes(shorter)) return true;
   const setA = new Set(wa);
   const setB = new Set(wb);
   const inter = [...setA].filter((w) => setB.has(w)).length;
   const union = new Set([...wa, ...wb]).size;
   return union > 0 && inter / union >= 0.7;
+}
+
+function normalizeDoi(doi: string): string {
+  return doi.trim().replace(/^doi:/i, "").replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "").trim();
 }
 
 function authorSurname(author?: string): string {
@@ -101,18 +105,21 @@ export async function checkCitation(entry: BibEntry): Promise<CitationCheck> {
   let doiFailed = false;
 
   if (entry.doi) {
-    const data = await fetchJson(`${CROSSREF_BASE}/${encodeURIComponent(entry.doi)}`);
+    const doi = normalizeDoi(entry.doi);
+    const data = await fetchJson(`${CROSSREF_BASE}/${encodeURIComponent(doi)}`);
     const crTitle = data?.message?.title?.[0];
     if (crTitle) {
+      if (!title) {
+        return { key: entry.key, title, doi: data.message.DOI, matchedTitle: crTitle, status: "unchecked" };
+      }
       const crYear = data.message.issued?.["date-parts"]?.[0]?.[0];
-      const titleOk = !title || titlesMatch(title, crTitle);
       const yearOk = !entry.year || !crYear || String(crYear) === String(entry.year);
       return {
         key: entry.key,
         title,
         doi: data.message.DOI,
         matchedTitle: crTitle,
-        status: titleOk && yearOk ? "found" : "mismatch",
+        status: titlesMatch(title, crTitle) && yearOk ? "found" : "mismatch",
       };
     }
     doiFailed = true;

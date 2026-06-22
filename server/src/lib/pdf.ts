@@ -5,7 +5,7 @@ import * as path from "path";
 
 function runPandoc(args: string[], cwd: string) {
   return new Promise<number>((resolve) => {
-    const pandoc = spawn("pandoc", args, { cwd });
+    const pandoc = spawn("pandoc", args, { cwd, detached: true });
     let settled = false;
     const finish = (code: number) => {
       if (settled) return;
@@ -14,7 +14,13 @@ function runPandoc(args: string[], cwd: string) {
       resolve(code);
     };
     const timer = setTimeout(() => {
-      pandoc.kill();
+      if (pandoc.pid) {
+        try {
+          process.kill(-pandoc.pid, "SIGKILL");
+        } catch {
+          pandoc.kill("SIGKILL");
+        }
+      }
       finish(1);
     }, 5 * 60 * 1000);
     pandoc.on("error", () => finish(1));

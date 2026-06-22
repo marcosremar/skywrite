@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { apiFetch } from "@/lib/apiFetch";
+import { apiFetch, encodePath } from "@/lib/apiFetch";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -215,7 +215,7 @@ export function FileTree({
 
     try {
       const response = await apiFetch(
-        `/api/projects/${projectId}/files/${encodeURIComponent(fileToDelete.path)}`,
+        `/api/projects/${projectId}/files/${encodePath(fileToDelete.path)}`,
         {
           method: "DELETE",
         }

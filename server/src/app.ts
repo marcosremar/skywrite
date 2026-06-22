@@ -16,6 +16,7 @@ import { pingGateway } from "./lib/ai-gateway.js";
 
 export function createApp() {
   const app = express();
+  app.set("trust proxy", 1);
 
   app.use(
     cors({

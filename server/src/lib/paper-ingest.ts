@@ -1,9 +1,11 @@
 import { extractText, getDocumentProxy } from "unpdf";
 import { db } from "../db.js";
 import type { SearchSource } from "./ai-gateway.js";
+import { resolvePublicUrl } from "./ssrf.js";
 
 const MAX_BYTES = 20 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 40_000;
+const MAX_REDIRECTS = 5;
 
 export interface IngestedPaper {
   url: string;
@@ -30,21 +32,52 @@ export function htmlToText(html: string): string {
     .trim();
 }
 
+async function safeFetch(start: string): Promise<Response | null> {
+  let current = start;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const safe = await resolvePublicUrl(current);
+    if (!safe) return null;
+    const res = await fetch(safe.toString(), {
+      redirect: "manual",
+      headers: { "User-Agent": "Mozilla/5.0 SkywriteBot" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) return null;
+      current = new URL(location, safe).toString();
+      continue;
+    }
+    return res;
+  }
+  return null;
+}
+
+function looksLikePdf(url: string, contentType: string, bytes: Uint8Array): boolean {
+  if (contentType.includes("pdf")) return true;
+  try {
+    if (new URL(url).pathname.toLowerCase().endsWith(".pdf")) return true;
+  } catch {
+    // ignore
+  }
+  return bytes.length >= 5 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+}
+
 async function fetchPaper(url: string): Promise<{ content: string; source: string } | null> {
-  const res = await fetch(resolvePdfUrl(url), {
-    redirect: "follow",
-    headers: { "User-Agent": "Mozilla/5.0 SkywriteBot" },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  if (!res.ok) return null;
+  const resolved = resolvePdfUrl(url);
+  const res = await safeFetch(resolved);
+  if (!res || !res.ok) return null;
 
   const contentType = res.headers.get("content-type") || "";
+  const declared = Number(res.headers.get("content-length") || 0);
+  if (declared > MAX_BYTES) return null;
+
   const buffer = await res.arrayBuffer();
   if (buffer.byteLength > MAX_BYTES) return null;
+  const bytes = new Uint8Array(buffer);
 
-  const isPdf = contentType.includes("pdf") || resolvePdfUrl(url).toLowerCase().endsWith(".pdf");
-  if (isPdf) {
-    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  if (looksLikePdf(resolved, contentType, bytes)) {
+    const pdf = await getDocumentProxy(bytes);
     const { text } = await extractText(pdf, { mergePages: true });
     return { content: text.trim(), source: "pdf" };
   }

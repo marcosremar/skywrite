@@ -37,16 +37,19 @@ buildRouter.post("/", heavyLimiter, async (req, res) => {
       return res.status(404).json({ error: "Project not found" });
     }
 
-    const inFlight = await db.build.findFirst({
-      where: { projectId: id, status: { in: ["QUEUED", "PROCESSING"] } },
+    const build = await db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
+      const inFlight = await tx.build.findFirst({
+        where: { projectId: id, status: { in: ["QUEUED", "PROCESSING"] } },
+      });
+      if (inFlight) return null;
+      return tx.build.create({
+        data: { projectId: id, type: "FULL", status: "PROCESSING", startedAt: new Date() },
+      });
     });
-    if (inFlight) {
+    if (!build) {
       return res.status(409).json({ error: "Já existe um build em andamento para este projeto" });
     }
-
-    const build = await db.build.create({
-      data: { projectId: id, type: "FULL", status: "PROCESSING", startedAt: new Date() },
-    });
 
     try {
       const result = await runPandocBuild(project.files);
@@ -87,10 +90,7 @@ buildRouter.post("/", heavyLimiter, async (req, res) => {
     }
   } catch (error) {
     console.error("Error creating build:", error);
-    return res.status(500).json({
-      error: "Build failed",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
+    return res.status(500).json({ error: "Falha ao gerar o PDF" });
   }
 });
 
@@ -207,7 +207,7 @@ async function runPandocBuild(files: BuildFile[]): Promise<BuildResult> {
 
 function runPandoc(args: string[], cwd: string) {
   return new Promise<{ code: number; output: string }>((resolve) => {
-    const pandoc = spawn("pandoc", args, { cwd });
+    const pandoc = spawn("pandoc", args, { cwd, detached: true });
     let output = "";
     let settled = false;
     const finish = (result: { code: number; output: string }) => {
@@ -217,7 +217,13 @@ function runPandoc(args: string[], cwd: string) {
       resolve(result);
     };
     const timer = setTimeout(() => {
-      pandoc.kill();
+      if (pandoc.pid) {
+        try {
+          process.kill(-pandoc.pid, "SIGKILL");
+        } catch {
+          pandoc.kill("SIGKILL");
+        }
+      }
       finish({ code: 1, output: "Build timed out after 5 minutes" });
     }, 5 * 60 * 1000);
     pandoc.stdout.on("data", (d) => (output += d.toString()));

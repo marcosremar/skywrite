@@ -51,27 +51,51 @@ export interface Verdict {
 
 const VALID_CLASSES: VerdictClass[] = ["supported", "partial", "unsupported", "uncertain"];
 
-export function parseResearchResponse(raw: string): { answer: string; verdicts: Verdict[] } {
+function extractJsonObject(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+    } else if (c === '"') inStr = true;
+    else if (c === "{") depth++;
+    else if (c === "}" && --depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+}
+
+export function parseResearchResponse(raw: string, maxSource = 0): { answer: string; verdicts: Verdict[] } {
   const cleaned = raw
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "")
     .trim();
-  const candidate = cleaned.startsWith("{") ? cleaned : cleaned.match(/\{[\s\S]*\}/)?.[0] ?? "";
+  const candidate = cleaned.startsWith("{") ? cleaned : extractJsonObject(cleaned);
   try {
-    const obj = JSON.parse(candidate);
+    const obj = JSON.parse(candidate ?? "");
     if (obj && typeof obj.answer === "string") {
       const verdicts: Verdict[] = Array.isArray(obj.verdicts)
         ? obj.verdicts
             .filter((v: unknown) => v && typeof (v as Verdict).claim === "string")
-            .map((v: Record<string, unknown>) => ({
-              claim: String(v.claim),
-              classification: VALID_CLASSES.includes(v.classification as VerdictClass)
-                ? (v.classification as VerdictClass)
-                : "uncertain",
-              evidence: typeof v.evidence === "string" ? v.evidence : "",
-              source: typeof v.source === "number" ? v.source : null,
-            }))
+            .map((v: Record<string, unknown>) => {
+              const src = v.source;
+              const validSource =
+                typeof src === "number" && src >= 1 && (maxSource === 0 || src <= maxSource) ? src : null;
+              return {
+                claim: String(v.claim),
+                classification: VALID_CLASSES.includes(v.classification as VerdictClass)
+                  ? (v.classification as VerdictClass)
+                  : "uncertain",
+                evidence: typeof v.evidence === "string" ? v.evidence : "",
+                source: validSource,
+              };
+            })
         : [];
       return { answer: obj.answer, verdicts };
     }
@@ -98,6 +122,10 @@ async function focusedQuery(question: string, content: string): Promise<string> 
   }
 }
 
+function stripFonteTag(text: string): string {
+  return text.replace(/<\/?\s*fonte\s*>/gi, " ");
+}
+
 function buildUserMessage(
   question: string,
   fileName: string,
@@ -111,8 +139,8 @@ function buildUserMessage(
         .map((s, i) => {
           const paper = byUrl.get(s.url);
           const body = paper
-            ? `TEXTO COMPLETO (trechos relevantes):\n<fonte>\n${relevantExcerpts(paper.content, question + " " + content)}\n</fonte>`
-            : `Resumo: <fonte>${s.snippet}</fonte>`;
+            ? `TEXTO COMPLETO (trechos relevantes):\n<fonte>\n${stripFonteTag(relevantExcerpts(paper.content, question + " " + content))}\n</fonte>`
+            : `Resumo: <fonte>${stripFonteTag(s.snippet)}</fonte>`;
           return `[${i + 1}] ${s.title}\n${s.url}\n${body}`;
         })
         .join("\n\n")
@@ -168,7 +196,7 @@ researchRouter.post("/", heavyLimiter, async (req, res) => {
       ],
       VERIFY_MODEL
     );
-    const { answer, verdicts } = parseResearchResponse(raw);
+    const { answer, verdicts } = parseResearchResponse(raw, sources.length);
 
     return res.json({
       answer,
@@ -178,10 +206,8 @@ researchRouter.post("/", heavyLimiter, async (req, res) => {
     });
   } catch (error) {
     console.error("Research error:", error);
-    const message = error instanceof Error ? error.message : "Erro desconhecido";
     return res.status(502).json({
       error: "Não foi possível consultar o orientador. Verifique se o ai-gateway está rodando.",
-      details: message,
     });
   }
 });

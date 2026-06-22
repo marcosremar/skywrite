@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { apiFetch } from "@/lib/apiFetch";
+import { apiFetch, encodePath } from "@/lib/apiFetch";
 import { FileTree } from "./FileTree";
 import { MarkdownEditor, MarkdownEditorRef } from "./MarkdownEditor";
 import { EditorToolbar } from "./EditorToolbar";
@@ -152,6 +152,8 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
     }
     setSelectedFile(null);
     setContent("");
+    setSaveError(false);
+    setLastSaved(null);
     requestAnimationFrame(() => {
       const draft = localStorage.getItem(`skywrite-draft:${project.id}:${file.path}`);
       setSelectedFile(file);
@@ -175,13 +177,14 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   const flushSave = useCallback(() => {
     const { file, content: text } = latestRef.current;
     if (!file || text === file.content) return;
-    apiFetch(`/api/projects/${project.id}/files/${file.path}`, {
+    apiFetch(`/api/projects/${project.id}/files/${encodePath(file.path)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: text }),
     })
       .then((res) => {
-        if (!res.ok) localStorage.setItem(draftKey(file.path), text);
+        if (res.ok) localStorage.removeItem(draftKey(file.path));
+        else localStorage.setItem(draftKey(file.path), text);
       })
       .catch(() => localStorage.setItem(draftKey(file.path), text));
   }, [project.id]);
@@ -208,7 +211,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
 
     setIsSaving(true);
     try {
-      const response = await apiFetch(`/api/projects/${project.id}/files/${file.path}`, {
+      const response = await apiFetch(`/api/projects/${project.id}/files/${encodePath(file.path)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: snapshot }),
@@ -297,7 +300,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
     if (!bibFile) return;
 
     try {
-      const response = await apiFetch(`/api/projects/${project.id}/files/${bibFile.path}`, {
+      const response = await apiFetch(`/api/projects/${project.id}/files/${encodePath(bibFile.path)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: newBibContent }),

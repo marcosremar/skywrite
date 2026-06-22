@@ -8,7 +8,7 @@ export interface BibEntry {
 }
 
 function field(body: string, name: string): string | undefined {
-  const match = body.match(new RegExp(`${name}\\s*=\\s*[{"]([\\s\\S]*?)[}"]\\s*[,\\n]`, "i"));
+  const match = body.match(new RegExp(`(?:^|[,{\\s])${name}\\s*=\\s*[{"]([\\s\\S]*?)[}"]\\s*[,\\n]?`, "i"));
   return match ? match[1].replace(/\s+/g, " ").trim() : undefined;
 }
 

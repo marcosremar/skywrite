@@ -2,6 +2,9 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "";
+if (process.env.NODE_ENV !== "test" && JWT_SECRET.length < 16) {
+  throw new Error("JWT_SECRET ausente ou fraco (mín. 16 caracteres)");
+}
 const TOKEN_COOKIE = "token";
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
