@@ -10,7 +10,9 @@
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "eval:citations": "bun eval/citation-benchmark.ts",
+    "eval:verdicts": "bun eval/verdict-benchmark.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
