@@ -26,7 +26,7 @@ projectsRouter.get("/", async (req, res) => {
 projectsRouter.post("/", async (req, res) => {
   try {
     const { name, title, language, templateId } = req.body ?? {};
-    if (!name) {
+    if (typeof name !== "string" || name.trim().length === 0 || name.length > 500) {
       return res.status(400).json({ error: "Nome do projeto e obrigatorio" });
     }
 
@@ -37,15 +37,16 @@ projectsRouter.post("/", async (req, res) => {
 
     if (templateId) {
       template = await getTemplate(templateId);
-      if (template) {
-        const templateFiles = await getTemplateDefaultFiles(templateId);
-        files = templateFiles.map((f) => ({
-          path: f.path,
-          name: f.name,
-          type: f.type as "YAML" | "MARKDOWN" | "BIBTEX" | "LATEX",
-          content: f.content,
-        }));
+      if (!template) {
+        return res.status(400).json({ error: "Template invalido" });
       }
+      const templateFiles = await getTemplateDefaultFiles(templateId);
+      files = templateFiles.map((f) => ({
+        path: f.path,
+        name: f.name,
+        type: f.type as "YAML" | "MARKDOWN" | "BIBTEX" | "LATEX",
+        content: f.content,
+      }));
     }
 
     if (!files || files.length === 0) {
@@ -98,7 +99,12 @@ projectsRouter.patch("/:id", async (req, res) => {
     const body = req.body ?? {};
     const data: Record<string, string> = {};
     for (const field of EDITABLE_FIELDS) {
-      if (body[field] !== undefined) data[field] = body[field];
+      const value = body[field];
+      if (value === undefined) continue;
+      if (typeof value !== "string" || value.length > 500) {
+        return res.status(400).json({ error: `Campo invalido: ${field}` });
+      }
+      data[field] = value;
     }
     const result = await db.project.updateMany({
       where: { id: req.params.id, userId: req.userId },

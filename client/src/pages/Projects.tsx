@@ -2,14 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -21,6 +13,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { apiFetch } from "@/lib/apiFetch";
 
 interface ProjectListItem {
   id: string;
@@ -34,18 +28,37 @@ interface ProjectListItem {
 export default function Projects() {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    fetch("/api/projects")
-      .then((res) => (res.ok ? res.json() : { projects: [] }))
-      .then((data) => setProjects(data.projects ?? []))
-      .catch(() => setProjects([]))
-      .finally(() => setLoading(false));
+    let active = true;
+    apiFetch("/api/projects")
+      .then(async (res) => {
+        if (!res.ok) throw new Error("fetch failed");
+        return res.json();
+      })
+      .then((data) => {
+        if (active) setProjects(data.projects ?? []);
+      })
+      .catch(() => {
+        if (active) setError(true);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleDelete = async (id: string) => {
-    const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
-    if (res.ok) setProjects((prev) => prev.filter((p) => p.id !== id));
+    try {
+      const res = await apiFetch(`/api/projects/${id}`, { method: "DELETE" });
+      if (res.ok) setProjects((prev) => prev.filter((p) => p.id !== id));
+      else toast.error("Não foi possível excluir o projeto");
+    } catch {
+      toast.error("Falha de conexão ao excluir");
+    }
   };
 
   return (
@@ -54,7 +67,7 @@ export default function Projects() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Meus Projetos</h1>
           <p className="text-muted-foreground">
-            Gerencie suas teses e documentos academicos
+            Gerencie suas teses e documentos acadêmicos
           </p>
         </div>
         <Link to="/projects/new">
@@ -64,45 +77,52 @@ export default function Projects() {
 
       {loading ? (
         <p className="text-muted-foreground">Carregando...</p>
+      ) : error ? (
+        <div className="border-t border-border py-20 text-center">
+          <h2 className="font-[family-name:var(--font-display)] text-2xl text-foreground">
+            Não foi possível carregar os projetos
+          </h2>
+          <p className="mx-auto mt-2 max-w-sm text-muted-foreground">
+            Verifique sua conexão e tente novamente.
+          </p>
+          <Button className="mt-6" onClick={() => window.location.reload()}>
+            Tentar novamente
+          </Button>
+        </div>
       ) : projects.length === 0 ? (
-        <Card className="text-center py-12">
-          <CardContent>
-            <div className="text-6xl mb-4">📝</div>
-            <h2 className="text-xl font-semibold mb-2">Nenhum projeto ainda</h2>
-            <p className="text-muted-foreground mb-4">
-              Crie seu primeiro projeto para comecar a escrever
-            </p>
-            <Link to="/projects/new">
-              <Button>Criar Projeto</Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="border-t border-border py-20 text-center">
+          <h2 className="font-[family-name:var(--font-display)] text-2xl text-foreground">
+            Nenhum projeto ainda
+          </h2>
+          <p className="mx-auto mt-2 max-w-sm text-muted-foreground">
+            Crie seu primeiro projeto para começar a escrever.
+          </p>
+          <Link to="/projects/new" className="mt-6 inline-block">
+            <Button>Criar Projeto</Button>
+          </Link>
+        </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-x-10 gap-y-3 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <div key={project.id} className="relative group">
-              <Link to={`/projects/${project.id}/editor`}>
-                <Card className="hover:border-primary transition-colors cursor-pointer h-full">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-lg">{project.name}</CardTitle>
-                      <Badge variant="secondary">{project.language}</Badge>
-                    </div>
-                    <CardDescription>
-                      {project.title || "Sem titulo definido"}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-4 text-sm text-muted-foreground">
-                      <span>{project._count.files} arquivos</span>
-                      <span>{project._count.builds} builds</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground/70 mt-2">
-                      Atualizado em{" "}
-                      {new Date(project.updatedAt).toLocaleDateString("pt-BR")}
-                    </p>
-                  </CardContent>
-                </Card>
+              <Link
+                to={`/projects/${project.id}/editor`}
+                className="block border-t border-border pb-6 pt-5 pr-8 transition-colors hover:border-primary"
+              >
+                <h3 className="font-[family-name:var(--font-display)] text-xl font-normal text-foreground transition-colors group-hover:text-primary">
+                  {project.name}
+                </h3>
+                <p className="mt-1.5 truncate text-sm text-muted-foreground">
+                  {project.title || "Sem título definido"}
+                </p>
+                <div className="mt-5 flex items-center gap-4 font-[family-name:var(--font-code)] text-[11px] uppercase tracking-wider text-muted-foreground/60">
+                  <span>{project.language}</span>
+                  <span>{project._count.files} arquivos</span>
+                  <span>{project._count.builds} builds</span>
+                  <span className="ml-auto normal-case tracking-normal text-muted-foreground/45">
+                    {new Date(project.updatedAt).toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
               </Link>
               <AlertDialog>
                 <AlertDialogTrigger asChild>

@@ -21,6 +21,14 @@ function authHeaders() {
   };
 }
 
+async function jsonOrThrow<T>(res: Response, label: string): Promise<T> {
+  try {
+    return (await res.json()) as T;
+  } catch {
+    throw new Error(`${label}: resposta nao-JSON do gateway`);
+  }
+}
+
 export async function pingGateway(): Promise<boolean> {
   if (!GATEWAY_KEY) return false;
   try {
@@ -41,7 +49,7 @@ export async function searchWeb(query: string, maxResults = 6): Promise<SearchSo
   if (!res.ok) {
     throw new Error(`Gateway search ${res.status}: ${(await res.text()).slice(0, 200)}`);
   }
-  const data = (await res.json()) as { results?: SearchSource[] };
+  const data = await jsonOrThrow<{ results?: SearchSource[] }>(res, "Gateway search");
   return (data.results || []).map((r) => ({
     title: r.title || "",
     url: r.url || "",
@@ -59,6 +67,6 @@ export async function chat(messages: ChatMessage[], model: string = CHAT_MODEL):
   if (!res.ok) {
     throw new Error(`Gateway chat ${res.status}: ${(await res.text()).slice(0, 200)}`);
   }
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const data = await jsonOrThrow<{ choices?: { message?: { content?: string } }[] }>(res, "Gateway chat");
   return data.choices?.[0]?.message?.content || "";
 }

@@ -109,9 +109,9 @@ export function SectionChecklist({
           {checklists.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
               <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Nenhuma secao detectada</p>
+              <p className="text-sm">Nenhuma seção detectada</p>
               <p className="text-xs mt-1">
-                Adicione secoes ao seu documento (## Introducao, ## Metodologia, etc.)
+                Adicione seções ao seu documento (## Introdução, ## Metodologia, etc.)
               </p>
             </div>
           ) : (
@@ -292,7 +292,7 @@ function ChecklistItemRow({ item }: ChecklistItemRowProps) {
 
         {/* Weight indicator */}
         <div className="flex gap-0.5">
-          {Array.from({ length: item.weight }).map((_, i) => (
+          {Array.from({ length: Math.max(1, Math.min(item.weight, 5)) }).map((_, i) => (
             <div
               key={i}
               className={cn(

@@ -38,6 +38,12 @@ Thumbs.db
 logs
 *.log
 
+# Coverage
+coverage/
+
+# Tooling artifacts
+.openchrome/
+
 # Cache
 .cache/
 .parcel-cache/

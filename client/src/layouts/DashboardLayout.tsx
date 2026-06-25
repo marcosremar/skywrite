@@ -17,6 +17,7 @@ export function DashboardLayout() {
   const initials =
     user?.name
       ?.split(" ")
+      .filter(Boolean)
       .map((n) => n[0])
       .join("")
       .toUpperCase()
@@ -28,7 +29,7 @@ export function DashboardLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-6">
@@ -47,7 +48,7 @@ export function DashboardLayout() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+              <Button variant="ghost" aria-label="Conta" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user?.image || ""} />
                   <AvatarFallback>{initials}</AvatarFallback>
@@ -65,7 +66,7 @@ export function DashboardLayout() {
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to="/settings">Configuracoes</Link>
+                <Link to="/settings">Configurações</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout}>Sair</DropdownMenuItem>

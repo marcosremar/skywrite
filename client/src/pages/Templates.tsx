@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { apiFetch } from "@/lib/apiFetch";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,11 +24,11 @@ interface Template {
 
 const defaultTemplate: Template = {
   id: "default",
-  name: "Tese/Dissertacao Padrao",
-  description: "Template padrao para teses e dissertacoes com formatacao academica",
+  name: "Tese/Dissertação Padrão",
+  description: "Template padrão para teses e dissertações com formatação acadêmica",
   category: "thesis",
   language: "pt-BR",
-  features: ["Capa automatica", "Sumario", "Referencias", "Estrutura academica"],
+  features: ["Capa automática", "Sumário", "Referências", "Estrutura acadêmica"],
 };
 
 export default function Templates() {
@@ -37,7 +38,7 @@ export default function Templates() {
   useEffect(() => {
     async function fetchTemplates() {
       try {
-        const response = await fetch("/api/templates");
+        const response = await apiFetch("/api/templates");
         if (response.ok) {
           const data = await response.json();
           setTemplates([defaultTemplate, ...(data.templates || [])]);

@@ -32,9 +32,10 @@ ${list(s.suggestions)}`
     .join("\n\n");
 
   const uncited = analysis.citations.uncitedAssertions.map((u) => u.text).slice(0, 15);
+  const safeTitle = projectName.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
   return `---
-title: "Relatório de Feedback — ${projectName}"
+title: "Relatório de Feedback — ${safeTitle}"
 ---
 
 # Pontuação geral: ${analysis.overallScore}/100
@@ -69,7 +70,7 @@ reportRouter.post("/", heavyLimiter, async (req, res) => {
       return res.status(404).json({ error: "Project not found" });
     }
 
-    const content = project.files.map((f) => f.content || "").join("\n\n");
+    const content = project.files.map((f) => f.content || "").join("\n\n").slice(0, 2_000_000);
     if (!content.trim()) {
       return res.status(400).json({ error: "Sem conteúdo para analisar" });
     }
@@ -84,6 +85,9 @@ reportRouter.post("/", heavyLimiter, async (req, res) => {
     return res.send(pdf);
   } catch (error) {
     console.error("Report error:", error);
+    if (error instanceof Error && error.message === "pandoc failed") {
+      return res.status(422).json({ error: "Falha ao compilar o PDF do relatório" });
+    }
     return res.status(500).json({ error: "Falha ao gerar o relatório" });
   }
 });

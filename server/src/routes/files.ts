@@ -3,6 +3,10 @@ import { Prisma } from "@prisma/client";
 import { db } from "../db.js";
 import { requireAuth } from "../auth.js";
 import { isSafeRelPath } from "../lib/safe-path.js";
+import { resolveFileType } from "../lib/file-type.js";
+import { rewriteFileReferences } from "../lib/file-references.js";
+
+const MAX_CONTENT_BYTES = 5_000_000;
 
 export const filesRouter = Router({ mergeParams: true });
 
@@ -30,6 +34,12 @@ filesRouter.post("/", async (req, res) => {
     if (!isSafeRelPath(path)) {
       return res.status(400).json({ error: "Caminho de arquivo invalido" });
     }
+    if (content !== undefined && typeof content !== "string") {
+      return res.status(400).json({ error: "Conteudo invalido" });
+    }
+    if (typeof content === "string" && Buffer.byteLength(content, "utf8") > MAX_CONTENT_BYTES) {
+      return res.status(413).json({ error: "Arquivo muito grande" });
+    }
 
     const project = await db.project.findFirst({
       where: { id, userId: req.userId },
@@ -46,7 +56,7 @@ filesRouter.post("/", async (req, res) => {
         path,
         name,
         content: content || "",
-        type: type || "OTHER",
+        type: resolveFileType(type, path),
         sizeBytes: Buffer.byteLength(content || "", "utf8"),
       },
     });
@@ -76,38 +86,21 @@ filesRouter.post("/rename", async (req, res) => {
       return res.status(404).json({ error: "Project not found" });
     }
 
-    const newName = newPath.split("/").pop();
-
-    const existingFile = await db.projectFile.findFirst({
-      where: { projectId: id, path: newPath },
-    });
-    if (existingFile) {
-      return res.status(400).json({ error: "File with this name already exists" });
-    }
+    const newName = newPath.split("/").pop()!;
 
     const file = await db.projectFile.update({
       where: { projectId_path: { projectId: id, path: oldPath } },
-      data: { path: newPath, name: newName, updatedAt: new Date() },
+      data: { path: newPath, name: newName, type: resolveFileType(undefined, newPath), updatedAt: new Date() },
     });
 
     if (updateReferences) {
-      const oldFileName = oldPath.split("/").pop() || "";
-      const newFileName = newPath.split("/").pop() || "";
-
-      const filesToUpdate = project.files.filter(
-        (f) =>
-          f.path !== oldPath &&
-          f.content &&
-          (f.content.includes(oldFileName) || f.content.includes(oldPath))
-      );
-
-      for (const fileToUpdate of filesToUpdate) {
-        let updatedContent = fileToUpdate.content || "";
-        updatedContent = updatedContent.split(oldPath).join(newPath);
-        updatedContent = updatedContent.split(`](${oldFileName})`).join(`](${newFileName})`);
+      for (const other of project.files) {
+        if (other.path === oldPath || !other.content) continue;
+        const updated = rewriteFileReferences(other.content, oldPath, newPath);
+        if (updated === other.content) continue;
         await db.projectFile.update({
-          where: { id: fileToUpdate.id },
-          data: { content: updatedContent, updatedAt: new Date() },
+          where: { id: other.id },
+          data: { content: updated, updatedAt: new Date() },
         });
       }
     }
@@ -149,6 +142,12 @@ filesRouter.put("/*", async (req, res) => {
       return res.status(400).json({ error: "Caminho de arquivo invalido" });
     }
     const { content } = req.body ?? {};
+    if (typeof content !== "string") {
+      return res.status(400).json({ error: "Conteudo invalido" });
+    }
+    if (Buffer.byteLength(content, "utf8") > MAX_CONTENT_BYTES) {
+      return res.status(413).json({ error: "Arquivo muito grande" });
+    }
 
     const project = await db.project.findFirst({
       where: { id, userId: req.userId },
@@ -161,7 +160,7 @@ filesRouter.put("/*", async (req, res) => {
       where: { projectId_path: { projectId: id, path: filePath } },
       data: {
         content,
-        sizeBytes: Buffer.byteLength(content || "", "utf8"),
+        sizeBytes: Buffer.byteLength(content, "utf8"),
         updatedAt: new Date(),
       },
     });

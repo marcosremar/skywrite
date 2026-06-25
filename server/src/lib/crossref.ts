@@ -24,16 +24,16 @@ function normalize(text: string): string {
     .trim();
 }
 
-function titlesMatch(a: string, b: string): boolean {
+export function titlesMatch(a: string, b: string): boolean {
   const na = normalize(a);
   const nb = normalize(b);
   if (!na || !nb) return false;
   if (na === nb) return true;
   const wa = na.split(" ");
   const wb = nb.split(" ");
-  const shorter = wa.length <= wb.length ? na : nb;
-  const longer = wa.length <= wb.length ? nb : na;
-  if (shorter.split(" ").length >= 4 && Math.abs(wa.length - wb.length) <= 2 && longer.includes(shorter)) return true;
+  const short = wa.length <= wb.length ? wa : wb;
+  const longSet = new Set(wa.length <= wb.length ? wb : wa);
+  if (short.length >= 4 && Math.abs(wa.length - wb.length) <= 2 && short.every((w) => longSet.has(w))) return true;
   const setA = new Set(wa);
   const setB = new Set(wb);
   const inter = [...setA].filter((w) => setB.has(w)).length;
@@ -41,11 +41,11 @@ function titlesMatch(a: string, b: string): boolean {
   return union > 0 && inter / union >= 0.7;
 }
 
-function normalizeDoi(doi: string): string {
+export function normalizeDoi(doi: string): string {
   return doi.trim().replace(/^doi:/i, "").replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "").trim();
 }
 
-function authorSurname(author?: string): string {
+export function authorSurname(author?: string): string {
   if (!author) return "";
   const first = author.split(/\s+and\s+|;/i)[0].trim();
   return first.includes(",") ? first.split(",")[0].trim() : first.split(/\s+/).pop() || "";
@@ -113,7 +113,8 @@ export async function checkCitation(entry: BibEntry): Promise<CitationCheck> {
         return { key: entry.key, title, doi: data.message.DOI, matchedTitle: crTitle, status: "unchecked" };
       }
       const crYear = data.message.issued?.["date-parts"]?.[0]?.[0];
-      const yearOk = !entry.year || !crYear || String(crYear) === String(entry.year);
+      const entryYear = entry.year?.match(/\d{4}/)?.[0];
+      const yearOk = !entryYear || !crYear || String(crYear) === entryYear;
       return {
         key: entry.key,
         title,
@@ -151,6 +152,20 @@ export async function checkCitation(entry: BibEntry): Promise<CitationCheck> {
   return { key: entry.key, title, matchedTitle: top, status: "not-found" };
 }
 
-export async function checkCitations(entries: BibEntry[], limit = 25): Promise<CitationCheck[]> {
-  return Promise.all(entries.slice(0, limit).map((e) => checkCitation(e)));
+export async function mapLimit<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  };
+  const workers = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: workers }, worker));
+  return results;
+}
+
+export async function checkCitations(entries: BibEntry[], limit = 25, concurrency = 5): Promise<CitationCheck[]> {
+  return mapLimit(entries.slice(0, limit), concurrency, (e) => checkCitation(e));
 }

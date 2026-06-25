@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { EditorLayout } from "@/components/editor/EditorLayout";
+import { apiFetch } from "@/lib/apiFetch";
 import type { Project, ProjectFile } from "@/types/models";
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [project, setProject] = useState<(Project & { files: ProjectFile[] }) | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/projects/${id}`)
+    apiFetch(`/api/projects/${id}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setProject(data?.project ?? null))
       .catch(() => setProject(null))
@@ -29,12 +29,9 @@ export default function Editor() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-muted-foreground">Projeto nao encontrado</p>
-        <button
-          className="text-primary hover:underline"
-          onClick={() => navigate("/projects")}
-        >
+        <Link to="/projects" className="text-primary hover:underline">
           Voltar para projetos
-        </button>
+        </Link>
       </div>
     );
   }

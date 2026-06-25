@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { db } from "../db.js";
 import { clearAuthCookie, requireAuth, setAuthCookie, signToken } from "../auth.js";
@@ -20,13 +21,13 @@ authRouter.post("/register", authLimiter, async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ error: "Email e senha sao obrigatorios" });
     }
-    if (!EMAIL_RE.test(email)) {
+    if (!EMAIL_RE.test(email) || email.length > 254) {
       return res.status(400).json({ error: "Email invalido" });
     }
-    if (typeof name !== "string" || name.trim().length === 0) {
+    if (typeof name !== "string" || name.trim().length === 0 || name.length > 200) {
       return res.status(400).json({ error: "Nome e obrigatorio" });
     }
-    if (typeof password !== "string" || password.length < 8) {
+    if (typeof password !== "string" || password.length < 8 || password.length > 200) {
       return res.status(400).json({ error: "Senha deve ter no minimo 8 caracteres" });
     }
 
@@ -54,6 +55,9 @@ authRouter.post("/login", authLimiter, async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     if (!email || !password) {
       return res.status(400).json({ error: "Email e senha sao obrigatorios" });
+    }
+    if (!EMAIL_RE.test(email) || typeof password !== "string") {
+      return res.status(401).json({ error: "Email ou senha incorretos" });
     }
 
     const user = await db.user.findUnique({ where: { email } });
@@ -84,14 +88,54 @@ authRouter.post("/logout", (_req, res) => {
 });
 
 authRouter.get("/me", requireAuth, async (req, res) => {
-  const user = await db.user.findUnique({
-    where: { id: req.userId },
-    select: { id: true, name: true, email: true, image: true },
-  });
-  if (!user) {
-    return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const user = await db.user.findUnique({
+      where: { id: req.userId },
+      select: { id: true, name: true, email: true, image: true },
+    });
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    return res.json({ user });
+  } catch (error) {
+    console.error("Auth me error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
-  return res.json({ user });
+});
+
+authRouter.get("/me/export", requireAuth, async (req, res) => {
+  try {
+    const user = await db.user.findUnique({
+      where: { id: req.userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        createdAt: true,
+        projects: {
+          select: {
+            id: true,
+            name: true,
+            title: true,
+            author: true,
+            language: true,
+            createdAt: true,
+            files: { select: { path: true, name: true, type: true, content: true } },
+            builds: {
+              select: { id: true, type: true, status: true, queuedAt: true, completedAt: true, pdfSizeBytes: true },
+            },
+          },
+        },
+      },
+    });
+    if (!user) return res.status(404).json({ error: "Not found" });
+    res.setHeader("Content-Disposition", 'attachment; filename="skywrite-export.json"');
+    return res.json(user);
+  } catch (error) {
+    console.error("Data export error:", error);
+    return res.status(500).json({ error: "Falha ao exportar dados" });
+  }
 });
 
 authRouter.delete("/me", requireAuth, async (req, res) => {
@@ -100,6 +144,10 @@ authRouter.delete("/me", requireAuth, async (req, res) => {
     clearAuthCookie(res);
     return res.json({ success: true });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      clearAuthCookie(res);
+      return res.json({ success: true });
+    }
     console.error("Account deletion error:", error);
     return res.status(500).json({ error: "Erro ao excluir conta" });
   }

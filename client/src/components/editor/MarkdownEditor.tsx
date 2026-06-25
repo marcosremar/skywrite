@@ -6,8 +6,8 @@ import { undo, redo } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
-import { Extension } from "@codemirror/state";
-import { autocompletion, CompletionContext, CompletionResult, startCompletion } from "@codemirror/autocomplete";
+import { Extension, StateField, StateEffect } from "@codemirror/state";
+import { autocompletion, CompletionContext, CompletionResult } from "@codemirror/autocomplete";
 
 // Citation widget that shows formatted citation with clickable individual citations
 class CitationWidget extends WidgetType {
@@ -30,11 +30,11 @@ class CitationWidget extends WidgetType {
     // Format each citation as clickable span
     this.citations.forEach((cite, index) => {
       // Extract author and year from cite key like "crystal2006" or "crystalLanguageInternet2006"
-      const match = cite.match(/^([a-zA-Z]+?)([A-Z][a-zA-Z]*)?(\d{4})$/);
+      const match = cite.match(/^([a-zA-Z]+).*?(\d{4})/);
       let formatted: string;
       if (match) {
         const author = match[1].charAt(0).toUpperCase() + match[1].slice(1);
-        const year = match[3];
+        const year = match[2];
         formatted = `${author}, ${year}`;
       } else {
         formatted = cite;
@@ -67,7 +67,7 @@ class CitationWidget extends WidgetType {
   }
 
   eq(other: CitationWidget) {
-    return this.raw === other.raw;
+    return other instanceof CitationWidget && this.raw === other.raw;
   }
 
   ignoreEvent() {
@@ -93,7 +93,11 @@ class ImageWidget extends WidgetType {
 
     // Handle load error
     img.onerror = () => {
-      container.innerHTML = `<div class="cm-image-error">Image not found: ${this.src}</div>`;
+      container.replaceChildren();
+      const errorEl = document.createElement("div");
+      errorEl.className = "cm-image-error";
+      errorEl.textContent = `Image not found: ${this.src}`;
+      container.appendChild(errorEl);
     };
 
     // Add alt text caption if present
@@ -111,7 +115,7 @@ class ImageWidget extends WidgetType {
   }
 
   eq(other: ImageWidget) {
-    return this.src === other.src && this.alt === other.alt;
+    return other instanceof ImageWidget && this.src === other.src && this.alt === other.alt;
   }
 
   ignoreEvent() {
@@ -133,6 +137,8 @@ export interface MarkdownEditorRef {
   undo: () => void;
   redo: () => void;
   insertAtCursor: (text: string) => void;
+  setGrammarMatches: (matches: { offset: number; length: number }[]) => void;
+  clearGrammar: () => void;
 }
 
 // Parse BibTeX content to extract citation entries
@@ -157,9 +163,33 @@ function parseBibTeX(bibContent: string): BibEntry[] {
 
     // Extract fields
     const getField = (name: string): string | undefined => {
-      const fieldRegex = new RegExp(`${name}\\s*=\\s*[{"]([^}"]+)[}"]`, "i");
-      const fieldMatch = content.match(fieldRegex);
-      return fieldMatch ? fieldMatch[1].trim() : undefined;
+      const head = new RegExp(`${name}\\s*=\\s*`, "i").exec(content);
+      if (!head) return undefined;
+      let i = head.index + head[0].length;
+      if (content[i] === "{") {
+        let depth = 0;
+        let value = "";
+        for (; i < content.length; i++) {
+          const ch = content[i];
+          if (ch === "{") {
+            depth++;
+            if (depth > 1) value += ch;
+          } else if (ch === "}") {
+            depth--;
+            if (depth === 0) break;
+            value += ch;
+          } else {
+            value += ch;
+          }
+        }
+        return value.trim();
+      }
+      if (content[i] === '"') {
+        const end = content.indexOf('"', i + 1);
+        return end === -1 ? undefined : content.slice(i + 1, end).trim();
+      }
+      const bare = content.slice(i).match(/^(\S+)/);
+      return bare ? bare[1] : undefined;
     };
 
     entries.push({
@@ -565,22 +595,10 @@ interface CitationModalState {
     rawCitation: string;  // The full citation like "[@cite1; @cite2]"
     citeKey: string;      // The specific key to replace like "cite1"
     citeIndex: number;    // Index of the citation in the array
+    range?: { from: number; to: number };
   };
 }
 
-let globalCitationModalState: CitationModalState = {
-  isOpen: false,
-  position: { x: 0, y: 0 },
-  citationRange: null,
-  onSelect: null,
-};
-
-let globalSetCitationModal: ((state: CitationModalState) => void) | null = null;
-
-// Expose to window for widget access
-if (typeof window !== "undefined") {
-  (window as unknown as { __citationModalSetter?: typeof globalSetCitationModal }).__citationModalSetter = null;
-}
 
 // Get all lines that contain the cursor or selection
 // Only returns active lines when editor is focused - otherwise all lines show rendered preview
@@ -735,14 +753,13 @@ function createLivePreviewDecorations(view: EditorView): DecorationSet {
         });
       }
 
-      // Links [text](url)
+      // Links [text](url) — use the ]( separator so nested brackets in the text are handled
       if (nodeType === "Link") {
         const text = doc.sliceString(node.from, node.to);
-        const linkMatch = text.match(/^\[([^\]]*)\]\(([^)]*)\)$/);
-        if (linkMatch) {
+        const sep = text.lastIndexOf("](");
+        if (text.startsWith("[") && text.endsWith(")") && sep > 0) {
           const textStart = node.from + 1;
-          const textEnd = node.from + 1 + linkMatch[1].length;
-          const urlStart = textEnd + 2; // ](
+          const textEnd = node.from + sep;
           const urlEnd = node.to;
 
           // Hide [
@@ -822,7 +839,6 @@ function createLivePreviewDecorations(view: EditorView): DecorationSet {
         to,
         decoration: Decoration.replace({
           widget: new ImageWidget(src, alt, imgMatch[0]),
-          block: true, // Images are block-level
         }),
       });
     }
@@ -865,12 +881,14 @@ function createLivePreviewPlugin() {
       }
 
       update(update: ViewUpdate) {
-        // Always recompute decorations to handle:
-        // - Document changes
-        // - Selection changes (active line detection)
-        // - Viewport changes
-        // - Focus changes (show/hide raw markdown)
-        // - Async syntax tree parsing completion
+        if (
+          !update.docChanged &&
+          !update.selectionSet &&
+          !update.viewportChanged &&
+          !update.focusChanged
+        ) {
+          return;
+        }
         try {
           this.decorations = createLivePreviewDecorations(update.view);
         } catch (e) {
@@ -888,89 +906,108 @@ function createLivePreviewPlugin() {
 // Line wrapping
 const lineWrapping = EditorView.lineWrapping;
 
-// Click handler for citation widgets and raw citations - opens modal
-const citationClickHandler = EditorView.domEventHandlers({
-  click: (event, view) => {
-    const target = event.target as HTMLElement;
-
-    // Check if clicked on a citation widget
-    if (target.classList.contains("cm-citation-widget")) {
-      event.preventDefault();
-      event.stopPropagation();
-
-      // Get click position for modal
-      const rect = target.getBoundingClientRect();
-
-      // Get the raw citation text from the title attribute
-      const rawCitation = target.getAttribute("title");
-      if (!rawCitation) return false;
-
-      // Find this citation in the document
-      const doc = view.state.doc;
-      const docText = doc.toString();
-      const citationIndex = docText.indexOf(rawCitation);
-
-      if (citationIndex >= 0 && globalSetCitationModal) {
-        globalSetCitationModal({
-          isOpen: true,
-          position: { x: rect.left, y: rect.bottom + 4 },
-          citationRange: { from: citationIndex, to: citationIndex + rawCitation.length },
-          onSelect: (key: string) => {
-            // Replace or add to the citation
-            const insideBrackets = rawCitation.slice(1, -1); // Remove [ and ]
-            const newContent = insideBrackets.includes(";")
-              ? `[${insideBrackets}; @${key}]`
-              : `[@${key}]`;
-
-            view.dispatch({
-              changes: { from: citationIndex, to: citationIndex + rawCitation.length, insert: newContent },
-            });
-          },
-        });
-        return true;
+interface GrammarRange {
+  from: number;
+  to: number;
+}
+const setGrammarEffect = StateEffect.define<GrammarRange[]>();
+const grammarMark = Decoration.mark({ class: "cm-grammar-issue" });
+const grammarField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    if (tr.docChanged) return Decoration.none;
+    for (const effect of tr.effects) {
+      if (effect.is(setGrammarEffect)) {
+        const len = tr.state.doc.length;
+        return Decoration.set(
+          effect.value
+            .filter((r) => r.from >= 0 && r.from < r.to && r.to <= len)
+            .map((r) => grammarMark.range(r.from, r.to)),
+          true
+        );
       }
     }
+    return deco;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
 
-    // Check if clicked on raw citation (on active line)
-    if (target.classList.contains("cm-citation-raw")) {
-      event.preventDefault();
-      event.stopPropagation();
+// Click handler for citation widgets and raw citations - opens modal
+const makeCitationClickHandler = (openModal: (state: CitationModalState) => void) =>
+  EditorView.domEventHandlers({
+    click: (event, view) => {
+      const target = event.target as HTMLElement;
 
-      const rect = target.getBoundingClientRect();
-      const pos = view.posAtDOM(target);
-      const doc = view.state.doc;
-      const docText = doc.toString();
+      // Check if clicked on a citation widget
+      if (target.classList.contains("cm-citation-widget")) {
+        event.preventDefault();
+        event.stopPropagation();
 
-      // Find the citation at this position
-      const citationRegex = /\[@[^\]]+\]/g;
-      let match;
-      while ((match = citationRegex.exec(docText)) !== null) {
-        if (match.index <= pos && pos <= match.index + match[0].length) {
-          if (globalSetCitationModal) {
-            globalSetCitationModal({
-              isOpen: true,
-              position: { x: rect.left, y: rect.bottom + 4 },
-              citationRange: { from: match.index, to: match.index + match[0].length },
-              onSelect: (key: string) => {
-                const currentContent = match![0];
-                const insideBrackets = currentContent.slice(1, -1);
-                const newContent = insideBrackets.includes(";")
-                  ? `[${insideBrackets}; @${key}]`
-                  : `[@${key}]`;
+        const rect = target.getBoundingClientRect();
+        const rawCitation = target.getAttribute("title");
+        if (!rawCitation) return false;
 
-                view.dispatch({
-                  changes: { from: match!.index, to: match!.index + match![0].length, insert: newContent },
-                });
-              },
-            });
-          }
+        const docText = view.state.doc.toString();
+        const clickedPos = view.posAtDOM(target);
+        const citationIndex =
+          docText.slice(clickedPos, clickedPos + rawCitation.length) === rawCitation
+            ? clickedPos
+            : docText.indexOf(rawCitation);
+
+        if (citationIndex >= 0) {
+          openModal({
+            isOpen: true,
+            position: { x: rect.left, y: rect.bottom + 4 },
+            citationRange: { from: citationIndex, to: citationIndex + rawCitation.length },
+            onSelect: (key: string) => {
+              const insideBrackets = rawCitation.slice(1, -1);
+              const newContent = insideBrackets.includes(";")
+                ? `[${insideBrackets}; @${key}]`
+                : `[@${key}]`;
+              view.dispatch({
+                changes: { from: citationIndex, to: citationIndex + rawCitation.length, insert: newContent },
+              });
+            },
+          });
           return true;
         }
       }
-    }
-    return false;
-  },
-});
+
+      // Check if clicked on raw citation (on active line)
+      if (target.classList.contains("cm-citation-raw")) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const rect = target.getBoundingClientRect();
+        const pos = view.posAtDOM(target);
+        const docText = view.state.doc.toString();
+
+        const citationRegex = /\[@[^\]]+\]/g;
+        let match;
+        while ((match = citationRegex.exec(docText)) !== null) {
+          if (match.index <= pos && pos <= match.index + match[0].length) {
+            const matched = match;
+            openModal({
+              isOpen: true,
+              position: { x: rect.left, y: rect.bottom + 4 },
+              citationRange: { from: matched.index, to: matched.index + matched[0].length },
+              onSelect: (key: string) => {
+                const insideBrackets = matched[0].slice(1, -1);
+                const newContent = insideBrackets.includes(";")
+                  ? `[${insideBrackets}; @${key}]`
+                  : `[@${key}]`;
+                view.dispatch({
+                  changes: { from: matched.index, to: matched.index + matched[0].length, insert: newContent },
+                });
+              },
+            });
+            return true;
+          }
+        }
+      }
+      return false;
+    },
+  });
 
 // Placeholder text
 const placeholderText = `# Comece a escrever sua tese...
@@ -1076,6 +1113,12 @@ function CitationModal({
   return (
     <div
       ref={modalRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Selecionar referência"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
       className="fixed z-50 bg-card border border-primary/30 rounded-lg shadow-xl max-h-80 w-80 overflow-hidden"
       style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
     >
@@ -1085,7 +1128,8 @@ function CitationModal({
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar referencia..."
+          aria-label="Buscar referência"
+          placeholder="Buscar referência..."
           className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
           autoFocus
         />
@@ -1130,6 +1174,7 @@ function CitationModal({
 export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(
   function MarkdownEditor({ value, onChange, filename, bibContent = "" }, ref) {
   const editorRef = useRef<ReactCodeMirrorRef>(null);
+  const pendingCitationRef = useRef<string | null>(null);
 
   const handleChange = useCallback(
     (val: string) => {
@@ -1156,11 +1201,31 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
       const view = editorRef.current?.view;
       if (!view) return;
       const { from, to } = view.state.selection.main;
+      if (text.includes("texto")) {
+        const [prefix, suffix] = text.split("texto");
+        const inner = view.state.sliceDoc(from, to) || "texto";
+        view.dispatch({
+          changes: { from, to, insert: `${prefix}${inner}${suffix}` },
+          selection: { anchor: from + prefix.length, head: from + prefix.length + inner.length },
+        });
+        view.focus();
+        return;
+      }
       view.dispatch({
         changes: { from, to, insert: text },
         selection: { anchor: from + text.length },
       });
       view.focus();
+    },
+    setGrammarMatches: (matches) => {
+      const view = editorRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        effects: setGrammarEffect.of(matches.map((m) => ({ from: m.offset, to: m.offset + m.length }))),
+      });
+    },
+    clearGrammar: () => {
+      editorRef.current?.view?.dispatch({ effects: setGrammarEffect.of([]) });
     },
   }), []);
 
@@ -1171,21 +1236,6 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     citationRange: null,
     onSelect: null,
   });
-
-  // Register global setter for the click handler
-  useEffect(() => {
-    globalSetCitationModal = setCitationModal;
-    // Also expose to window for widget access
-    if (typeof window !== "undefined") {
-      (window as unknown as { __citationModalSetter: typeof globalSetCitationModal }).__citationModalSetter = setCitationModal;
-    }
-    return () => {
-      globalSetCitationModal = null;
-      if (typeof window !== "undefined") {
-        (window as unknown as { __citationModalSetter: typeof globalSetCitationModal }).__citationModalSetter = null;
-      }
-    };
-  }, []);
 
   // Global mousedown handler for citation widgets (captures before CodeMirror processes)
   useEffect(() => {
@@ -1210,6 +1260,14 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
         const rawCitation = container?.getAttribute("data-citation") || container?.getAttribute("title") || "";
 
         if (rawCitation && citeKey) {
+          const view = editorRef.current?.view;
+          let range: { from: number; to: number } | undefined;
+          if (view && container) {
+            const pos = view.posAtDOM(container as HTMLElement);
+            if (view.state.doc.sliceString(pos, pos + rawCitation.length) === rawCitation) {
+              range = { from: pos, to: pos + rawCitation.length };
+            }
+          }
           setCitationModal({
             isOpen: true,
             position: { x: rect.left, y: rect.bottom + 4 },
@@ -1219,6 +1277,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
               rawCitation,
               citeKey,
               citeIndex,
+              range,
             },
           });
         }
@@ -1249,7 +1308,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             citationRange: null,
             onSelect: null,
           });
-          (window as unknown as Record<string, string>).__pendingCitation = rawCitation;
+          pendingCitationRef.current = rawCitation;
         }
         return;
       }
@@ -1291,7 +1350,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             citationRange: null,
             onSelect: null,
           });
-          (window as unknown as Record<string, string>).__pendingCitation = rawText;
+          pendingCitationRef.current = rawText;
         }
         return;
       }
@@ -1308,40 +1367,46 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
   // Parse bib entries for autocomplete
   const bibEntries = useMemo(() => parseBibTeX(bibContent), [bibContent]);
 
-  // Extensions for CodeMirror with Live Preview
-  // Create fresh extensions each time to ensure proper initialization
-  const extensions: Extension[] = [
-    markdown({
-      base: markdownLanguage,
-      codeLanguages: languages,
-      addKeymap: true,
-    }),
-    syntaxHighlighting(customHighlightStyle),
-    createLivePreviewPlugin(),
-    lineWrapping,
-    citationClickHandler,
-    autocompletion({
-      override: [createCitationAutocomplete(bibEntries)],
-      activateOnTyping: true,
-      icons: false,
-      aboveCursor: false, // Always show below cursor
-      defaultKeymap: true,
-      optionClass: () => "cm-citation-option",
-    }),
-  ];
+  const extensions = useMemo<Extension[]>(
+    () => [
+      markdown({
+        base: markdownLanguage,
+        codeLanguages: languages,
+        addKeymap: true,
+      }),
+      syntaxHighlighting(customHighlightStyle),
+      EditorView.contentAttributes.of({ "aria-label": "Editor de texto markdown" }),
+      createLivePreviewPlugin(),
+      grammarField,
+      lineWrapping,
+      makeCitationClickHandler(setCitationModal),
+      autocompletion({
+        override: [createCitationAutocomplete(bibEntries)],
+        activateOnTyping: true,
+        icons: false,
+        aboveCursor: false,
+        defaultKeymap: true,
+        optionClass: () => "cm-citation-option",
+      }),
+    ],
+    [bibEntries]
+  );
 
   const handleCitationSelect = useCallback((key: string) => {
     // If we have a replaceMode, replace the specific citation in the document
     if (citationModal.replaceMode) {
-      const { rawCitation, citeIndex } = citationModal.replaceMode;
+      const { rawCitation, citeIndex, range } = citationModal.replaceMode;
       const view = editorRef.current?.view;
 
       if (view) {
         const doc = view.state.doc;
         const docText = doc.toString();
 
-        // Find the citation in the document
-        const citationIndex = docText.indexOf(rawCitation);
+        // Use the range captured at click time (handles duplicate citations); fall back to first match
+        const citationIndex =
+          range && docText.slice(range.from, range.to) === rawCitation
+            ? range.from
+            : docText.indexOf(rawCitation);
 
         if (citationIndex >= 0) {
           // Parse the citations inside the brackets
@@ -1369,7 +1434,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
       citationModal.onSelect(key);
     } else {
       // Fallback: check for pending citation (old-style widgets)
-      const pendingCitation = (window as unknown as Record<string, string>).__pendingCitation;
+      const pendingCitation = pendingCitationRef.current;
       if (pendingCitation) {
         const view = editorRef.current?.view;
         if (view) {
@@ -1391,7 +1456,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             });
           }
         }
-        delete (window as unknown as Record<string, string>).__pendingCitation;
+        pendingCitationRef.current = null;
       }
     }
   }, [citationModal.replaceMode, citationModal.onSelect]);

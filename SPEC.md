@@ -41,8 +41,6 @@ Modelos ativos:
 
 Enums: `FileType` = MARKDOWN | YAML | BIBTEX | LATEX | IMAGE | PDF | OTHER. `BuildType` = FULL | PREVIEW | DRAFT. `BuildStatus` = QUEUED | PROCESSING | COMPLETED | FAILED | CANCELLED.
 
-> O schema ainda contém tabelas da era NextAuth (`Account`, `Session`, `VerificationToken`) e `Citation`, atualmente não usadas pela autenticação JWT.
-
 ## 4. Autenticação
 
 JWT assinado com `JWT_SECRET`, entregue em cookie httpOnly `token` (`SameSite=Lax`, 30 dias). Middleware:
@@ -63,6 +61,7 @@ Base: `/api`. Respostas JSON. Rotas marcadas com 🔒 exigem cookie de auth.
 | POST | `/api/auth/login` | Valida credenciais, seta cookie. 401 se inválido. |
 | POST | `/api/auth/logout` | Limpa cookie. |
 | GET | `/api/auth/me` 🔒 | Usuário atual. |
+| GET | `/api/auth/me/export` 🔒 | Exporta todos os dados do usuário em JSON (portabilidade LGPD), sem `passwordHash`. |
 | DELETE | `/api/auth/me` 🔒 | Exclui a conta e todos os dados (LGPD). |
 
 `/api/auth/register` e `/api/auth/login` têm rate-limit; e-mail é normalizado e validado, `name` é obrigatório.
@@ -90,13 +89,23 @@ Base: `/api`. Respostas JSON. Rotas marcadas com 🔒 exigem cookie de auth.
 ### Análise, Build, Orientador
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| POST | `/api/projects/:id/analyze` 🔒 | Análise local (regras) dos `.md` → `{ analysis: { overallScore, sections, citations } }`. |
+| POST | `/api/projects/:id/analyze` 🔒 | Análise local dos `.md` → `{ analysis, metrics, consistency }` (regras + legibilidade + siglas não definidas). |
 | GET | `/api/projects/:id/build` 🔒 | Últimos builds (sem o PDF). |
 | POST | `/api/projects/:id/build` 🔒 | Gera PDF (pandoc→tectonic); rate-limit + 409 se já há build em andamento; retorna `pdfPath`. |
 | GET | `/api/projects/:id/build/:buildId/pdf` 🔒 | Serve o PDF (inline; `?download=1` para baixar). |
 | POST | `/api/projects/:id/research` 🔒 | Orientador Virtual (RAG). Retorna `{ answer, verdicts[], sources }`; verdicts em 4 classes (supported/partial/unsupported/uncertain) + trecho. Ver §7. |
 | POST | `/api/projects/:id/research/sources` 🔒 | Sugere fontes acadêmicas para uma afirmação (`{ claim }`). |
 | POST | `/api/projects/:id/citations/check` 🔒 | Verifica existência das referências do `.bib` no Crossref (found/mismatch/not-found). |
+| POST | `/api/projects/:id/citations/integrity` 🔒 | Cross-check in-text↔`.bib` (`orphans`/`unused`) + completude ABNT (`incomplete`). |
+| POST | `/api/projects/:id/citations/doi` 🔒 | DOI → entrada BibTeX completa via Crossref (`{ doi }` → `{ bibtex }`). |
+| POST | `/api/projects/:id/citations/from-source` 🔒 | Fonte sugerida → BibTeX: resolve DOI pelo título (Crossref) ou cai pra `@online` (`{ title, url }` → `{ bibtex, resolved }`). |
+| POST | `/api/projects/:id/citations/ris` 🔒 | Import RIS (Zotero/Mendeley) → BibTeX (`{ ris }` → `{ bibtex }`). |
+| POST | `/api/projects/:id/citations/submission` 🔒 | Checklist de prontidão para submissão (`{ checks }`). |
+| POST | `/api/projects/:id/originality` 🔒 | Plágio/detector de IA via provedor externo configurável (`{ configured, aiScore, plagiarismScore }`); `configured:false` sem provedor. |
+| POST | `/api/projects/:id/grammar` 🔒 | Correção gramatical/ortográfica via LanguageTool (`{ text, language }` → `{ matches }`); 502 se indisponível. |
+| POST | `/api/projects/:id/writing/titles` 🔒 | Sugere títulos (LLM); 200 ou 502. |
+| POST | `/api/projects/:id/writing/abstract` 🔒 | Gera resumo/abstract (LLM); 200 ou 502. |
+| POST | `/api/projects/:id/writing/paraphrase` 🔒 | Reescreve um trecho (`{ text }`) (LLM); 200 ou 502. |
 | POST | `/api/projects/:id/report` 🔒 | Gera PDF do relatório de feedback (análise por seção) e retorna o binário. |
 
 ### Saúde
@@ -139,7 +148,7 @@ pandoc <chapters.md ordenados> --citeproc --toc \
   --pdf-engine=tectonic -o output.pdf
 ```
 
-Usa `--citeproc` (CSL) — não depende de biblatex/biber nem de fontes TeX Gyre. O PDF volta como data URL base64 em `pdfUrl` e é registrado em `Build`. Requer `pandoc` e `tectonic` instalados (tectonic baixa pacotes LaTeX sob demanda na 1ª execução).
+Usa `--citeproc` (CSL) — não depende de biblatex/biber nem de fontes TeX Gyre. O PDF gerado é gravado no Backblaze B2 (API S3-compatível, `lib/storage.ts`) sob a key `builds/<projectId>/<buildId>.pdf`, guardada em `Build.pdfUrl`; a rota `GET .../pdf` baixa do B2 e serve pela rota autenticada (bucket privado). Sem as variáveis `B2_*` configuradas, faz fallback para data URL base64 no próprio `pdfUrl` (builds antigos com `data:` continuam sendo servidos). Requer `pandoc` e `tectonic` instalados (tectonic baixa pacotes LaTeX sob demanda na 1ª execução).
 
 ## 9. Integração com o ai-gateway
 
@@ -155,13 +164,20 @@ Use `127.0.0.1` (não `localhost`) — o `fetch` do Node resolve `localhost` par
 | Var | Default | Uso |
 | --- | --- | --- |
 | `DATABASE_URL` | — | Postgres (Prisma). |
-| `JWT_SECRET` | `dev-secret` | Assinatura do token. |
+| `JWT_SECRET` | — | Assinatura do token; **obrigatório, mín. 16 chars** (server falha no boot sem ele, exceto em testes). |
 | `PORT` | `4000` | Porta do server. |
 | `CLIENT_ORIGIN` | `http://localhost:5175` | CORS. |
+| `CLIENT_DIST` | `../client/dist` | Diretório do SPA estático servido pelo Express na mesma origem. |
 | `AI_GATEWAY_URL` | `http://127.0.0.1:9012` | Endpoint do gateway. |
 | `AI_GATEWAY_KEY` | — | Bearer do gateway. |
 | `AI_GATEWAY_MODEL` | `llama-3.3-70b-versatile` | Modelo do chat. |
-| `USE_DOCKER_BUILD` | `false` | Legado do build antigo (não usado pelo build pandoc). |
+| `AI_GATEWAY_VERIFY_MODEL` | = `AI_GATEWAY_MODEL` | Modelo usado na verificação de afirmações do Orientador. |
+| `CROSSREF_MAILTO` | `support@skywrite.app` | E-mail do polite pool do Crossref (DOI/títulos). |
+| `B2_ENDPOINT` / `B2_REGION` | — | Endpoint S3-compatível e região do bucket Backblaze B2. |
+| `B2_KEY_ID` / `B2_APP_KEY` | — | Credenciais (application key) do B2. |
+| `B2_BUCKET` | — | Bucket onde os PDFs de build são gravados. |
+| `LANGUAGETOOL_URL` | `https://api.languagetool.org` | Endpoint do LanguageTool (gramática); aponte para instância self-hosted em produção. |
+| `ORIGINALITY_API_URL` / `ORIGINALITY_API_KEY` | — | Provedor externo de plágio/detecção de IA; sem eles, `/originality` responde `configured:false`. |
 
 `server/.env` está no `.gitignore`. Portas: client **5175**, server **4000**, gateway **9012**.
 

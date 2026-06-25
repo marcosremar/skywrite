@@ -23,10 +23,15 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    if (password.length < 8) {
+      setError("A senha deve ter no mínimo 8 caracteres");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      await register(name, email, password);
+      await register(name.trim(), email.trim(), password);
       navigate("/projects");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao criar conta");
@@ -36,10 +41,15 @@ export default function Register() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <div className="flex min-h-screen items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-foreground">Criar conta</CardTitle>
+          <p className="font-[family-name:var(--font-code)] text-[10px] uppercase tracking-[0.3em] text-primary">
+            Skywrite
+          </p>
+          <CardTitle className="font-[family-name:var(--font-display)] text-3xl font-light text-foreground">
+            Criar conta
+          </CardTitle>
           <CardDescription>Comece a escrever sua tese hoje</CardDescription>
         </CardHeader>
         <CardContent>
@@ -71,7 +81,7 @@ export default function Register() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Minimo 8 caracteres"
+                placeholder="Mínimo 8 caracteres"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={8}

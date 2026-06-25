@@ -15,7 +15,16 @@ function ipBlocked(ip: string): boolean {
   if (lower === "::1" || lower === "::") return true;
   if (lower.startsWith("fc") || lower.startsWith("fd")) return true;
   if (/^fe[89ab]/.test(lower)) return true;
-  if (lower.startsWith("::ffff:")) return ipBlocked(lower.slice(7));
+  if (lower.startsWith("::ffff:")) {
+    const rest = lower.slice(7);
+    if (isIP(rest) === 4) return ipBlocked(rest);
+    const hex = rest.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (hex) {
+      const hi = parseInt(hex[1], 16);
+      const lo = parseInt(hex[2], 16);
+      return ipBlocked(`${(hi >> 8) & 255}.${hi & 255}.${(lo >> 8) & 255}.${lo & 255}`);
+    }
+  }
   return false;
 }
 
@@ -30,7 +39,13 @@ export async function resolvePublicUrl(raw: string): Promise<URL | null> {
   const host = url.hostname.replace(/^\[|\]$/g, "");
   try {
     if (isIP(host)) return ipBlocked(host) ? null : url;
-    const addrs = await lookup(host, { all: true });
+    const addrs = await Promise.race([
+      lookup(host, { all: true }),
+      new Promise<never>((_, reject) => {
+        const t = setTimeout(() => reject(new Error("dns timeout")), 5000);
+        t.unref?.();
+      }),
+    ]);
     if (addrs.length === 0 || addrs.some((a) => ipBlocked(a.address))) return null;
     return url;
   } catch {

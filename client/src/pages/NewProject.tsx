@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { apiFetch } from "@/lib/apiFetch";
 
 interface Template {
   id: string;
@@ -45,7 +46,7 @@ export default function NewProject() {
     async function fetchTemplate() {
       if (!templateId || templateId === "default") return;
       try {
-        const response = await fetch(`/api/templates/${templateId}`);
+        const response = await apiFetch(`/api/templates/${templateId}`);
         if (response.ok) {
           const data = await response.json();
           setTemplate(data.template);
@@ -62,22 +63,27 @@ export default function NewProject() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    if (!name.trim()) {
+      setError("Nome do projeto é obrigatório");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/projects", {
+      const response = await apiFetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
-          title,
+          name: name.trim(),
+          title: title.trim(),
           language,
           templateId: templateId !== "default" ? templateId : null,
         }),
       });
 
       if (!response.ok) {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         setError(data.error || "Erro ao criar projeto");
         return;
       }
@@ -170,10 +176,10 @@ export default function NewProject() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pt-BR">Portugues (Brasil)</SelectItem>
-                  <SelectItem value="pt-PT">Portugues (Portugal)</SelectItem>
-                  <SelectItem value="en-US">Ingles</SelectItem>
-                  <SelectItem value="fr-FR">Frances</SelectItem>
+                  <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
+                  <SelectItem value="pt-PT">Português (Portugal)</SelectItem>
+                  <SelectItem value="en-US">Inglês</SelectItem>
+                  <SelectItem value="fr-FR">Francês</SelectItem>
                   <SelectItem value="es-ES">Espanhol</SelectItem>
                 </SelectContent>
               </Select>
@@ -182,7 +188,7 @@ export default function NewProject() {
             {error && <p className="text-sm text-destructive">{error}</p>}
 
             <div className="flex gap-4">
-              <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+              <Button type="button" variant="outline" onClick={() => navigate("/projects")}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={loading}>

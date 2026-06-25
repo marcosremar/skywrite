@@ -4,11 +4,13 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { apiFetch, encodePath } from "@/lib/apiFetch";
+import { formatTime } from "@/lib/formatTime";
 import { FileTree } from "./FileTree";
 import { MarkdownEditor, MarkdownEditorRef } from "./MarkdownEditor";
 import { EditorToolbar } from "./EditorToolbar";
 import { BibliographyEditor } from "./BibliographyEditor";
 import { AIAdvisor } from "./AIAdvisor";
+import { ReviewPanel } from "./ReviewPanel";
 import { Button } from "@/components/ui/button";
 import {
   PanelRightClose,
@@ -23,6 +25,7 @@ import {
   Maximize2,
   Minimize2,
   ArrowLeft,
+  SpellCheck,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -105,7 +108,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   const [saveError, setSaveError] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [rightTab, setRightTab] = useState<"preview" | "advisor">("preview");
+  const [rightTab, setRightTab] = useState<"preview" | "advisor" | "review">("preview");
   const [metadata, setMetadata] = useState({
     name: project.name || "",
     title: project.title || "",
@@ -119,10 +122,21 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const editorRef = useRef<MarkdownEditorRef>(null);
+  const loadedFileRef = useRef<string | null>(selectedFile?.id ?? null);
   const { preferences, updatePreferences, isLoaded } = useEditorPreferences();
 
-  // Destructure preferences
-  const { showAdvisorPanel, showSidebar, focusMode } = preferences;
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  const { focusMode } = preferences;
+  const showAdvisorPanel = preferences.showAdvisorPanel && !isMobile;
+  const showSidebar = preferences.showSidebar && !isMobile;
 
   // Handlers
   const handleUndo = useCallback(() => editorRef.current?.undo(), []);
@@ -133,8 +147,9 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   const toggleFocusMode = () => updatePreferences({ focusMode: !focusMode });
 
   const handlePanelResize = useCallback((sizes: number[]) => {
+    if (isMobile || sizes.length < 2) return;
     updatePreferences({ panelSizes: sizes });
-  }, [updatePreferences]);
+  }, [isMobile, updatePreferences]);
 
   const bibFile = useMemo(() => files.find((f) => f.path.endsWith(".bib")), [files]);
   const bibContent = bibFile?.content || "";
@@ -150,6 +165,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
     if (current.file && current.content !== current.file.content) {
       flushSave();
     }
+    loadedFileRef.current = null;
     setSelectedFile(null);
     setContent("");
     setSaveError(false);
@@ -163,6 +179,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
       } else {
         setContent(file.content || "");
       }
+      loadedFileRef.current = file.id;
     });
   }, [project.id]);
 
@@ -176,7 +193,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
 
   const flushSave = useCallback(() => {
     const { file, content: text } = latestRef.current;
-    if (!file || text === file.content) return;
+    if (!file || loadedFileRef.current !== file.id || text === file.content) return;
     apiFetch(`/api/projects/${project.id}/files/${encodePath(file.path)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -251,7 +268,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
       });
       const data = await response.json();
       if (response.ok && data.pdfPath) {
-        setPdfUrl(data.pdfPath);
+        setPdfUrl(`${data.pdfPath}?t=${Date.now()}`);
       } else {
         setBuildError(data.error || data.details || "Build failed");
       }
@@ -266,34 +283,48 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   const handleSaveMetadata = async () => {
     setSavingMetadata(true);
     try {
-      await apiFetch(`/api/projects/${project.id}`, {
+      const res = await apiFetch(`/api/projects/${project.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(metadata),
       });
+      if (!res.ok) {
+        toast.error("Não foi possível salvar os metadados");
+        return;
+      }
+      toast.success("Metadados salvos");
+    } catch {
+      toast.error("Falha ao salvar metadados");
     } finally {
       setSavingMetadata(false);
     }
   };
 
   const handleInsertImage = async (file: File) => {
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve((reader.result as string).split(",")[1] || "");
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
-    const filePath = `media/${safeName}`;
-    const response = await apiFetch(`/api/projects/${project.id}/files`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: filePath, content: base64, type: "IMAGE" }),
-    });
-    if (!response.ok) return;
-    const { file: created } = await response.json();
-    setFiles((prev) => [...prev, created]);
-    editorRef.current?.insertAtCursor(`\n![${file.name}](${filePath})\n`);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1] || "");
+        reader.onerror = () => reject(new Error("read failed"));
+        reader.readAsDataURL(file);
+      });
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
+      const filePath = `media/${safeName}`;
+      const response = await apiFetch(`/api/projects/${project.id}/files`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: filePath, content: base64, type: "IMAGE" }),
+      });
+      if (!response.ok) {
+        toast.error("Falha ao inserir imagem");
+        return;
+      }
+      const { file: created } = await response.json();
+      setFiles((prev) => [...prev, created]);
+      editorRef.current?.insertAtCursor(`\n![${file.name}](${filePath})\n`);
+    } catch {
+      toast.error("Falha ao inserir imagem");
+    }
   };
 
   const handleSaveBibliography = async (newBibContent: string) => {
@@ -318,9 +349,45 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
     }
   };
 
+  const handleCiteSource = useCallback(
+    async (source: { title: string; url: string }) => {
+      let bibtex = "";
+      let resolved = false;
+      try {
+        const res = await apiFetch(`/api/projects/${project.id}/citations/from-source`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(source),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          bibtex = data.bibtex;
+          resolved = data.resolved;
+        }
+      } catch {
+        bibtex = "";
+      }
+      if (!bibtex) {
+        const slug = source.title.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "fonte";
+        bibtex = `@online{${slug},\n  title = {${source.title}},\n  url = {${source.url}}\n}`;
+      }
+      const rawKey = bibtex.match(/@\w+\s*\{\s*([^,\s]+)/)?.[1] || "fonte";
+      const existing = new Set([...bibContent.matchAll(/@\w+\s*\{\s*([^,\s]+)/g)].map((m) => m[1]));
+      let key = rawKey;
+      let n = 1;
+      while (existing.has(key)) key = `${rawKey}${n++}`;
+      if (key !== rawKey) bibtex = bibtex.replace(`{${rawKey},`, `{${key},`);
+      handleSaveBibliography(`${bibContent}\n\n${bibtex}`.trim());
+      editorRef.current?.insertAtCursor(`[@${key}]`);
+      toast.success(resolved ? "Citação inserida (DOI resolvido)" : "Citação inserida");
+    },
+    [bibContent, project.id]
+  );
+
   // Auto-save on content change (debounced)
   useEffect(() => {
-    if (!selectedFile || content === selectedFile.content) return;
+    if (!selectedFile || loadedFileRef.current !== selectedFile.id) return;
+    if (content === selectedFile.content) return;
 
     const timeout = setTimeout(() => {
       handleSave();
@@ -328,6 +395,19 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
 
     return () => clearTimeout(timeout);
   }, [content, selectedFile]);
+
+  const saveRef = useRef(handleSave);
+  saveRef.current = handleSave;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Loading state
   if (!isLoaded) {
@@ -388,12 +468,16 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                   projectId={project.id}
                   onFileCreated={(file) => setFiles((prev) => [...prev, file])}
                   onFileDeleted={(fileId) => {
-                    setFiles((prev) => prev.filter((f) => f.id !== fileId));
-                    if (selectedFile?.id === fileId) {
-                      const remaining = files.filter((f) => f.id !== fileId);
-                      setSelectedFile(remaining[0] || null);
-                      setContent(remaining[0]?.content || "");
-                    }
+                    setFiles((prev) => {
+                      const remaining = prev.filter((f) => f.id !== fileId);
+                      if (selectedFile?.id === fileId) {
+                        const next = remaining[0] || null;
+                        loadedFileRef.current = next?.id ?? null;
+                        setSelectedFile(next);
+                        setContent(next?.content || "");
+                      }
+                      return remaining;
+                    });
                   }}
                   onFileRenamed={(updatedFile) => {
                     setFiles((prev) =>
@@ -465,6 +549,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                   <BibliographyEditor
                     bibContent={bibContent}
                     onSave={handleSaveBibliography}
+                    projectId={project.id}
                   />
                 </div>
 
@@ -480,7 +565,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                       <span className="text-muted-foreground">Não salvo</span>
                     ) : lastSaved ? (
                       <span className="text-muted-foreground">
-                        Salvo {lastSaved.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                        Salvo {formatTime(lastSaved, project.language)}
                       </span>
                     ) : null}
                   </span>
@@ -581,8 +666,11 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                           ["language", "Idioma"],
                         ] as const).map(([field, label]) => (
                           <div key={field} className="space-y-1.5">
-                            <label className="text-sm font-medium text-primary">{label}</label>
+                            <label htmlFor={`meta-${field}`} className="text-sm font-medium text-primary">
+                              {label}
+                            </label>
                             <input
+                              id={`meta-${field}`}
                               value={metadata[field]}
                               onChange={(e) => setMetadata((m) => ({ ...m, [field]: e.target.value }))}
                               className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -615,7 +703,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
             >
               <Tabs
                 value={rightTab}
-                onValueChange={(v) => setRightTab(v as "preview" | "advisor")}
+                onValueChange={(v) => setRightTab(v as "preview" | "advisor" | "review")}
                 className="h-full flex flex-col"
               >
                 <TabsList className="mx-3 mt-2 w-fit">
@@ -626,6 +714,10 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                   <TabsTrigger value="advisor" className="text-xs gap-1.5">
                     <Sparkles className="h-3.5 w-3.5" />
                     Orientador Virtual
+                  </TabsTrigger>
+                  <TabsTrigger value="review" className="text-xs gap-1.5">
+                    <SpellCheck className="h-3.5 w-3.5" />
+                    Revisão
                   </TabsTrigger>
                 </TabsList>
 
@@ -652,7 +744,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                           </div>
                           <p className="font-medium text-destructive mb-2">Erro ao gerar PDF</p>
                           <p className="text-sm text-muted-foreground">{buildError}</p>
-                          <Button variant="outline" size="sm" onClick={handleBuild} className="mt-4">
+                          <Button variant="outline" size="sm" onClick={handleBuild} disabled={isBuilding} className="mt-4">
                             Tentar novamente
                           </Button>
                         </div>
@@ -661,7 +753,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                       <div className="flex flex-col h-full">
                         <div className="flex justify-end px-3 py-1.5 border-b border-border">
                           <a
-                            href={`${pdfUrl}?download=1`}
+                            href={`${pdfUrl}&download=1`}
                             download
                             className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
                           >
@@ -681,7 +773,7 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                           <p className="text-sm text-muted-foreground mb-4">
                             Clique em &ldquo;Gerar PDF&rdquo; para visualizar seu documento
                           </p>
-                          <Button variant="outline" size="sm" onClick={handleBuild}>
+                          <Button variant="outline" size="sm" onClick={handleBuild} disabled={isBuilding}>
                             <FileDown className="w-4 h-4 mr-2" />
                             Gerar PDF
                           </Button>
@@ -693,10 +785,19 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
 
                 <TabsContent value="advisor" className="flex-1 min-h-0 m-0 overflow-hidden">
                   <AIAdvisor
-                    key={`advisor-${selectedFile?.id || "no-file"}`}
                     content={currentFileContent}
                     fileName={selectedFile?.name || ""}
                     projectId={project.id}
+                    language={project.language}
+                    onCite={handleCiteSource}
+                  />
+                </TabsContent>
+
+                <TabsContent value="review" className="flex-1 min-h-0 m-0 overflow-hidden">
+                  <ReviewPanel
+                    projectId={project.id}
+                    content={currentFileContent}
+                    onGrammarMatches={(m) => editorRef.current?.setGrammarMatches(m)}
                   />
                 </TabsContent>
               </Tabs>

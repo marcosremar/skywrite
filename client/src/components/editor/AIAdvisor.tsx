@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { apiFetch } from "@/lib/apiFetch";
+import { formatTime } from "@/lib/formatTime";
 import { cn } from "@/lib/utils";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -45,14 +47,18 @@ interface AIAdvisorProps {
   content: string;
   fileName?: string;
   projectId?: string;
+  language?: string;
   className?: string;
+  onCite?: (source: { title: string; url: string }) => void;
 }
 
 export function AIAdvisor({
   content,
   fileName,
   projectId,
+  language = "pt-BR",
   className,
+  onCite,
 }: AIAdvisorProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const [expandedSections, setExpandedSections] = useState<Set<SectionType>>(
@@ -72,7 +78,10 @@ export function AIAdvisor({
     setReportLoading(true);
     try {
       const res = await apiFetch(`/api/projects/${projectId}/report`, { method: "POST" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        toast.error("Não foi possível gerar o relatório");
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -80,6 +89,8 @@ export function AIAdvisor({
       a.download = "relatorio.pdf";
       a.click();
       URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Falha ao gerar o relatório");
     } finally {
       setReportLoading(false);
     }
@@ -91,11 +102,15 @@ export function AIAdvisor({
     try {
       const res = await apiFetch(`/api/projects/${projectId}/citations/check`, { method: "POST" });
       if (res.ok) setCitations((await res.json()).results || []);
+      else toast.error("Não foi possível verificar as citações");
+    } catch {
+      toast.error("Falha ao verificar citações");
     } finally {
       setCitationLoading(false);
     }
   };
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafRef = useRef<number | null>(null);
   const lastContentRef = useRef<string>("");
 
   // Auto-analyze when content changes (debounced - waits 3 seconds after user stops typing)
@@ -127,7 +142,7 @@ export function AIAdvisor({
       setPendingUpdate(false);
 
       // Small delay to show analyzing state, then compute
-      requestAnimationFrame(() => {
+      rafRef.current = requestAnimationFrame(() => {
         const result = analyzeThesis(content);
         lastContentRef.current = content;
         setAnalysis(result);
@@ -136,9 +151,8 @@ export function AIAdvisor({
     }, 3000);
 
     return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [content]);
 
@@ -215,10 +229,7 @@ export function AIAdvisor({
             ) : (
               <span className="text-muted-foreground">
                 - Atualizado:{" "}
-                {new Date(analysis.analyzedAt).toLocaleTimeString("pt-BR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                {formatTime(new Date(analysis.analyzedAt), language)}
               </span>
             )}
           </div>
@@ -238,7 +249,7 @@ export function AIAdvisor({
           </TabsTrigger>
           <TabsTrigger value="sections" className="text-xs">
             <BookOpen className="h-3 w-3 mr-1" />
-            Secao
+            Seção
           </TabsTrigger>
           <TabsTrigger value="rules" className="text-xs">
             <Settings2 className="h-3 w-3 mr-1" />
@@ -310,10 +321,10 @@ export function AIAdvisor({
               <div className="text-center py-8">
                 <BookOpen className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  Nenhuma secao identificada neste documento.
+                  Nenhuma seção identificada neste documento.
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Adicione um titulo como &ldquo;# Introducao&rdquo; para comecar.
+                  Adicione um titulo como &ldquo;# Introdução&rdquo; para começar.
                 </p>
               </div>
             ) : (
@@ -337,7 +348,7 @@ export function AIAdvisor({
 
           {/* Chat Tab */}
           <TabsContent value="chat" className="p-4 m-0">
-            <ChatInterface projectId={projectId} content={content} fileName={fileName} />
+            <ChatInterface projectId={projectId} content={content} fileName={fileName} onCite={onCite} />
           </TabsContent>
         </ScrollArea>
       </Tabs>
@@ -373,7 +384,7 @@ function WaitingState() {
       <div className="space-y-2 text-left text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-green-500" />
-          <span>Analisa estrutura por secao</span>
+          <span>Analisa estrutura por seção</span>
         </div>
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -540,14 +551,14 @@ function OverviewContent({ analysis }: { analysis: ThesisAnalysis }) {
             ))}
           </div>
           <p className="text-xs text-muted-foreground italic">
-            Adicione referencias para dar credibilidade as afirmacoes.
+            Adicione referencias para dar credibilidade às afirmações.
           </p>
         </div>
       )}
 
       {/* Sections Overview */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium">Progresso por Secao</h4>
+        <h4 className="text-sm font-medium">Progresso por Seção</h4>
         <div className="space-y-2">
           {analysis.sections.map((section) => (
             <div
@@ -678,7 +689,7 @@ function SectionCard({
             <div>
               <p className="text-xs font-medium text-primary mb-1.5 flex items-center gap-1">
                 <Lightbulb className="h-3 w-3" />
-                Sugestoes
+                Sugestões
               </p>
               <ul className="space-y-1.5">
                 {feedback.suggestions.map((s, i) => (
@@ -796,8 +807,9 @@ function RulesManager() {
             />
           </div>
           <div>
-            <label className="text-xs font-medium mb-1 block">Secao (opcional)</label>
+            <label htmlFor="rule-section" className="text-xs font-medium mb-1 block">Seção (opcional)</label>
             <select
+              id="rule-section"
               value={newRule.section || ""}
               onChange={(e) => setNewRule(prev => ({
                 ...prev,
@@ -805,13 +817,13 @@ function RulesManager() {
               }))}
               className="w-full px-2 py-1.5 text-sm rounded border border-border bg-background"
             >
-              <option value="">Geral (todas as secoes)</option>
-              <option value="introduction">Introducao</option>
+              <option value="">Geral (todas as seções)</option>
+              <option value="introduction">Introdução</option>
               <option value="literature-review">Revisao de Literatura</option>
               <option value="methodology">Metodologia</option>
               <option value="results">Resultados</option>
               <option value="discussion">Discussao</option>
-              <option value="conclusion">Conclusao</option>
+              <option value="conclusion">Conclusão</option>
             </select>
           </div>
           <div className="flex gap-2">
@@ -848,7 +860,7 @@ function RulesManager() {
       {sectionRules.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Regras por Secao
+            Regras por Seção
           </h4>
           <div className="space-y-1">
             {sectionRules.map(rule => (
@@ -953,10 +965,12 @@ function ChatInterface({
   projectId,
   content,
   fileName,
+  onCite,
 }: {
   projectId?: string;
   content: string;
   fileName?: string;
+  onCite?: (source: { title: string; url: string }) => void;
 }) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -1037,11 +1051,11 @@ function ChatInterface({
               </button>
               <button
                 onClick={() =>
-                  setMessage("Minha revisao de literatura esta adequada?")
+                  setMessage("Minha revisão de literatura esta adequada?")
                 }
                 className="text-xs text-primary hover:underline block mx-auto"
               >
-                "Minha revisao de literatura esta adequada?"
+                "Minha revisão de literatura esta adequada?"
               </button>
             </div>
           </div>
@@ -1105,6 +1119,15 @@ function ChatInterface({
                             texto completo
                           </span>
                         )}
+                        {onCite && (
+                          <button
+                            type="button"
+                            onClick={() => onCite({ title: s.title, url: s.url })}
+                            className="text-[10px] px-1.5 py-0.5 rounded border border-border hover:bg-muted whitespace-nowrap"
+                          >
+                            + Citar
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1125,12 +1148,12 @@ function ChatInterface({
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && handleSend()}
           placeholder="Pergunte algo sobre sua tese..."
           disabled={loading}
           className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
         />
-        <Button size="icon" onClick={handleSend} disabled={!message.trim() || loading}>
+        <Button size="icon" aria-label="Enviar" onClick={handleSend} disabled={!message.trim() || loading}>
           <Send className="h-4 w-4" />
         </Button>
       </div>

@@ -102,6 +102,9 @@ export function parseResearchResponse(raw: string, maxSource = 0): { answer: str
   } catch {
     // fall through
   }
+  if (candidate && candidate.trim().startsWith("{")) {
+    return { answer: "Não consegui processar a resposta do Orientador. Tente reformular a pergunta.", verdicts: [] };
+  }
   return { answer: raw, verdicts: [] };
 }
 
@@ -176,7 +179,7 @@ researchRouter.post("/", heavyLimiter, async (req, res) => {
 
     let sources: SearchSource[] = [];
     try {
-      sources = await searchWeb(searchQuery);
+      sources = (await searchWeb(searchQuery)).filter((s) => s.url && s.title);
     } catch (err) {
       console.error("Search failed:", err);
     }

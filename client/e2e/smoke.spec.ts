@@ -93,7 +93,7 @@ test("citation check against Crossref shows status badges", async ({ page }) => 
   await openDemoProject(page);
   await page.getByRole("tab", { name: "Orientador Virtual" }).click();
   await page.getByRole("button", { name: "Verificar referências" }).click();
-  await expect(page.getByText(/encontrada|não encontrada|divergente/).first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText(/encontrada|não encontrada|divergente/).first()).toBeVisible({ timeout: 90000 });
 });
 
 test("markdown live preview conceals syntax off the cursor line", async ({ page }) => {
@@ -102,4 +102,13 @@ test("markdown live preview conceals syntax off the cursor line", async ({ page 
   await page.locator(".cm-line", { hasText: "inteligência artificial" }).first().click();
   const heading = page.locator(".cm-line", { hasText: "Introdução" }).first();
   await expect(heading.locator(".cm-lp-hidden")).toHaveCount(1);
+});
+
+test("clicking a rendered citation opens the citation editor modal", async ({ page }) => {
+  await login(page);
+  await openDemoProject(page);
+  await page.getByText("02-referencial.md").click();
+  await page.waitForSelector(".cm-citation-item", { timeout: 15000 });
+  await page.locator(".cm-citation-item").first().click();
+  await expect(page.getByPlaceholder("Buscar referência...")).toBeVisible({ timeout: 5000 });
 });

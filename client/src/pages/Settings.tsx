@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuth } from "@/auth";
 import { apiFetch } from "@/lib/apiFetch";
 import { Button } from "@/components/ui/button";
@@ -24,12 +26,45 @@ import {
 export default function Settings() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const handleDeleteAccount = async () => {
-    const res = await apiFetch("/api/auth/me", { method: "DELETE" });
-    if (res.ok) {
+    setDeleting(true);
+    try {
+      const res = await apiFetch("/api/auth/me", { method: "DELETE" });
+      if (!res.ok) {
+        toast.error("Não foi possível excluir a conta");
+        return;
+      }
       await logout();
       navigate("/");
+    } catch {
+      toast.error("Falha de conexão");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await apiFetch("/api/auth/me/export");
+      if (!res.ok) {
+        toast.error("Falha ao exportar dados");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "skywrite-export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Falha de conexão ao exportar");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -49,6 +84,20 @@ export default function Settings() {
           <p>
             <span className="text-muted-foreground">Email:</span> {user?.email}
           </p>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Exportar meus dados</CardTitle>
+          <CardDescription>
+            Baixe todos os seus dados (projetos, arquivos, builds) em JSON — portabilidade LGPD.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" onClick={handleExport} disabled={exporting}>
+            {exporting ? "Exportando…" : "Exportar meus dados"}
+          </Button>
         </CardContent>
       </Card>
 
@@ -72,9 +121,9 @@ export default function Settings() {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteAccount}>
-                  Excluir conta
+                <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteAccount} disabled={deleting}>
+                  {deleting ? "Excluindo…" : "Excluir conta"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

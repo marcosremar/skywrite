@@ -31,6 +31,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
       - run: bun install
       - run: bunx prisma generate
       - run: bunx prisma migrate deploy
@@ -46,5 +51,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
       - run: bun install
+      - run: bun run typecheck
+      - run: bun run test
       - run: bun run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: skywrite
+          POSTGRES_PASSWORD: skywrite
+          POSTGRES_DB: skywrite
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://skywrite:skywrite@localhost:5432/skywrite?schema=public
+      JWT_SECRET: ci-secret-not-for-production-0000000000
+      CLIENT_ORIGIN: http://localhost:5175
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install
+      - run: bunx prisma generate
+        working-directory: server
+      - run: bunx prisma migrate deploy
+        working-directory: server
+      - run: bun run db:seed
+        working-directory: server
+      - run: bunx playwright install --with-deps chromium
+        working-directory: client
+      - run: bunx playwright test
+        working-directory: client

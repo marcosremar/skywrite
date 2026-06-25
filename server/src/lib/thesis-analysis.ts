@@ -28,14 +28,14 @@ const SECTION_PATTERNS: Record<SectionType, RegExp[]> = {
   ],
   introduction: [
     /^##?\s*(introdução|introducao|introduction)/im,
-    /^##?\s*1[\.\)]\s*(introdução|introducao|introduction)/im,
+    /^##?\s*1[\.\)]?\s+(introdução|introducao|introduction)/im,
     /^#\s+introdução/im,
     /^#\s+introduction/im,
   ],
   "literature-review": [
     /^##?\s*(revisão\s*(de\s*)?literatura|fundamentação\s*teórica|referencial\s*teórico)/im,
     /^##?\s*(literature\s*review|theoretical\s*framework)/im,
-    /^##?\s*2[\.\)]\s*(revisão|fundamentação|referencial)/im,
+    /^##?\s*2[\.\)]?\s+(revisão|fundamentação|referencial)/im,
     /^#\s+revisão\s*(de\s*)?literatura/im,
     /^#\s+referencial\s*teórico/im,
     /^#\s+fundamentação/im,
@@ -43,30 +43,31 @@ const SECTION_PATTERNS: Record<SectionType, RegExp[]> = {
   methodology: [
     /^##?\s*(metodologia|método|materiais\s*e\s*métodos)/im,
     /^##?\s*(methodology|methods|materials\s*and\s*methods)/im,
-    /^##?\s*3[\.\)]\s*(metodologia|método)/im,
+    /^##?\s*3[\.\)]?\s+(metodologia|método)/im,
     /^#\s+metodologia/im,
   ],
   results: [
     /^##?\s*(resultados|findings|results)/im,
-    /^##?\s*4[\.\)]\s*(resultados)/im,
+    /^##?\s*4[\.\)]?\s+(resultados)/im,
     /^#\s+resultados/im,
   ],
   discussion: [
     /^##?\s*(discussão|discussao|discussion)/im,
-    /^##?\s*5[\.\)]\s*(discussão|discussao)/im,
+    /^##?\s*5[\.\)]?\s+(discussão|discussao)/im,
     /^#\s+discussão/im,
     /^#\s+discussao/im,
   ],
   conclusion: [
     /^##?\s*(conclusão|conclusao|considerações\s*finais|conclusion)/im,
-    /^##?\s*6[\.\)]\s*(conclusão|considerações)/im,
+    /^##?\s*6[\.\)]?\s+(conclusão|considerações)/im,
     /^#\s+conclusão/im,
     /^#\s+conclusao/im,
     /^#\s+considerações\s*finais/im,
   ],
   references: [
-    /^##?\s*(referências|referencias|bibliography|references)/im,
+    /^##?\s*(referências|referencias|bibliografia|bibliography|references)/im,
     /^#\s+referências/im,
+    /^#\s+bibliografia/im,
   ],
   // Title is checked LAST and only matches generic titles (not section names)
   title: [
@@ -131,11 +132,11 @@ const DETECTION_PATTERNS: Record<string, RegExp[]> = {
     /primeiramente|em\s*seguida|por\s*fim|inicialmente/i,
   ],
   "lit-coverage": [
-    /\[@\w+\d{4}\]/g, // At least has some citations
+    /\[@[\w:.-]+\]/, // At least has some citations
   ],
   "lit-recent": [
-    /\[@\w+(202[0-9]|201[5-9])\]/i, // Recent years in citations
-    /\(.*20(2[0-9]|1[5-9]).*\)/i,
+    /\[@[\w:.-]*(202[0-9]|201[5-9])[\w:.-]*\]/i, // Recent years in citations
+    /\([^)]*20(2[0-9]|1[5-9])[^)]*\)/i,
   ],
   "lit-synthesis": [
     /enquanto|por\s*outro\s*lado|diferentemente|em\s*contrapartida|similarmente/i,
@@ -316,14 +317,18 @@ export function extractSections(content: string): Map<SectionType, string> {
   let currentSection: SectionType | null = null;
   let currentContent: string[] = [];
 
+  const flush = () => {
+    if (!currentSection) return;
+    const text = currentContent.join("\n");
+    const prev = sections.get(currentSection);
+    sections.set(currentSection, prev ? `${prev}\n${text}` : text);
+  };
+
   for (const line of lines) {
     const detectedSection = detectSectionType(line);
 
     if (detectedSection && detectedSection !== currentSection) {
-      // Save previous section
-      if (currentSection) {
-        sections.set(currentSection, currentContent.join("\n"));
-      }
+      flush();
       currentSection = detectedSection;
       currentContent = [line];
     } else if (currentSection) {
@@ -331,10 +336,7 @@ export function extractSections(content: string): Map<SectionType, string> {
     }
   }
 
-  // Save last section
-  if (currentSection) {
-    sections.set(currentSection, currentContent.join("\n"));
-  }
+  flush();
 
   return sections;
 }
@@ -344,9 +346,9 @@ export function extractSections(content: string): Map<SectionType, string> {
  */
 export function countCitations(content: string): number {
   const citationPatterns = [
-    /\[@[\w-]+\]/g, // Markdown citation [@author2024]
+    /\[@[\w:.-]+\]/g, // Markdown citation [@author2024]
     /\([\w\s]+,\s*\d{4}\)/g, // APA style (Author, 2024)
-    /\d+\.\s*[\w\s]+\.\s*\d{4}/g, // Numbered references
+    /^\d+\.\s*[\w\s]+\.\s*\d{4}/gm, // Numbered references at line start
   ];
 
   let count = 0;
@@ -363,10 +365,11 @@ export function countCitations(content: string): number {
  * Extracts years from citations
  */
 export function extractCitationYears(content: string): number[] {
-  const yearPattern = /\b(19|20)\d{2}\b/g;
-  const matches = content.match(yearPattern);
+  const maxYear = new Date().getFullYear() + 1;
+  const matches = content.match(/\b(19|20)\d{2}\b/g);
   if (!matches) return [];
-  return [...new Set(matches.map((y) => parseInt(y)))].sort((a, b) => b - a);
+  const years = matches.map((y) => parseInt(y)).filter((y) => y <= maxYear);
+  return [...new Set(years)].sort((a, b) => b - a);
 }
 
 /**
@@ -390,11 +393,14 @@ function analyzeChecklistItem(
   if (!patterns) {
     return { detected: false };
   }
+  if (patterns.length === 0) {
+    return { detected: true };
+  }
 
   for (const pattern of patterns) {
-    const match = content.match(pattern);
+    const re = new RegExp(pattern.source, pattern.flags.replace("g", ""));
+    const match = re.exec(content);
     if (match) {
-      // Find the line number
       const beforeMatch = content.substring(0, match.index);
       const lineNumber = beforeMatch.split("\n").length;
       return {
@@ -556,7 +562,7 @@ export function generateSectionFeedback(
     const currentYear = new Date().getFullYear();
     const recentYears = years.filter((y) => currentYear - y <= 5);
 
-    if (years.length > 0 && recentYears.length < years.length * 0.3) {
+    if (years.length >= 5 && recentYears.length < years.length * 0.3) {
       weaknesses.push("Muitas referências antigas");
       suggestions.push(`Inclua mais publicações dos últimos 5 anos (${currentYear-5}-${currentYear}). Referências recentes mostram atualização do pesquisador.`);
     } else if (recentYears.length >= years.length * 0.5) {
@@ -659,6 +665,9 @@ function checkRule(rule: Rule, content: string, detectedSection: SectionType | n
   }
 
   try {
+    if (rule.pattern.length > 200) {
+      return { rule, passed: true };
+    }
     const regex = new RegExp(rule.pattern, 'im');
     const match = content.match(regex);
 
@@ -741,7 +750,7 @@ const ASSERTION_PATTERNS: { pattern: RegExp; type: string }[] = [
   { pattern: /é\s+(consenso|unanimidade|amplamente\s+aceito)/i, type: "Consenso alegado" },
 
   // Statistics and numbers
-  { pattern: /\d+(\,\d+)?%\s+(dos?|das?|de)/i, type: "Estatística" },
+  { pattern: /\d+(?:[.,]\d+)?\s*%/i, type: "Estatística" },
   { pattern: /(a\s+maioria|grande\s+parte|a\s+maior\s+parte)\s+(dos?|das?|de)/i, type: "Quantificação" },
   { pattern: /(muitos|diversos|vários|inúmeros)\s+(estudos|autores|pesquisadores|especialistas)/i, type: "Quantificação de fontes" },
 
@@ -750,7 +759,7 @@ const ASSERTION_PATTERNS: { pattern: RegExp; type: string }[] = [
   { pattern: /(especialistas|pesquisadores|estudiosos)\s+(afirmam|defendem|argumentam|sustentam)/i, type: "Alegação de especialistas" },
 
   // Causal claims
-  { pattern: /\b(causa|provoca|leva\s+a|resulta\s+em|gera|produz)\b/i, type: "Relação causal" },
+  { pattern: /\b(provoca|provocam|leva\s+a|levam\s+a|resulta\s+em|resultam\s+em|produz|produzem)\b/i, type: "Relação causal" },
   { pattern: /\b(é\s+fundamental|é\s+essencial|é\s+crucial|é\s+necessário)\s+(para|que)/i, type: "Alegação de importância" },
 
   // Definitive statements
@@ -828,7 +837,7 @@ export function analyzeCitations(content: string): CitationAnalysis {
             if (match && match.index !== undefined) {
               const start = Math.max(0, match.index - 20);
               const end = Math.min(text.length, match.index + match[0].length + 50);
-              text = (start > 0 ? '...' : '') + text.substring(start, end) + (end < line.length ? '...' : '');
+              text = (start > 0 ? '...' : '') + text.substring(start, end) + (end < text.length ? '...' : '');
             } else {
               text = text.substring(0, 97) + '...';
             }

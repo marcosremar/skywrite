@@ -53,17 +53,17 @@ export const SYSTEM_RULES: Rule[] = [
   {
     id: 'general-no-first-person',
     label: 'Evitar primeira pessoa',
-    description: 'Texto academico geralmente usa terceira pessoa ou voz passiva',
-    pattern: '\\b(eu|meu|minha|meus|minhas|nos|nosso|nossa)\\b',
+    description: 'Texto acadêmico geralmente usa terceira pessoa ou voz passiva',
+    pattern: '\\b(eu|meu|minha|meus|minhas|nós|nosso|nossa|nossos|nossas)\\b',
     section: null,
     isSystemRule: true,
     isEnabled: false, // Disabled by default - some styles allow first person
   },
   {
     id: 'general-has-citations',
-    label: 'Possui citacoes',
-    description: 'O texto deve conter referencias bibliograficas',
-    pattern: '\\[@|\\(\\w+,\\s*\\d{4}\\)',
+    label: 'Possui citações',
+    description: 'O texto deve conter referências bibliográficas',
+    pattern: '\\[@|\\([\\w\\s.]+,\\s*\\d{4}\\)',
     section: null,
     isSystemRule: true,
     isEnabled: true,
@@ -73,7 +73,7 @@ export const SYSTEM_RULES: Rule[] = [
   {
     id: 'intro-has-relevance',
     label: 'Justificativa da pesquisa',
-    description: 'Explica por que a pesquisa e importante',
+    description: 'Explica por que a pesquisa é importante',
     pattern: 'importan|relevan|necessari|fundamental|essencial|justifica|contribui',
     section: 'introduction',
     isSystemRule: true,
@@ -101,8 +101,8 @@ export const SYSTEM_RULES: Rule[] = [
   // Literature review rules
   {
     id: 'lit-has-comparison',
-    label: 'Comparacao entre autores',
-    description: 'Compara diferentes perspectivas teoricas',
+    label: 'Comparação entre autores',
+    description: 'Compara diferentes perspectivas teóricas',
     pattern: 'enquanto|por outro lado|diferente|similar|corrobora|diverge|concorda|discorda',
     section: 'literature-review',
     isSystemRule: true,
@@ -139,8 +139,8 @@ export const SYSTEM_RULES: Rule[] = [
   },
   {
     id: 'method-has-ethics',
-    label: 'Aspectos eticos',
-    description: 'Menciona aprovacao etica ou consentimento',
+    label: 'Aspectos éticos',
+    description: 'Menciona aprovação ética ou consentimento',
     pattern: 'etica|cep|tcle|consentimento|comite|aprovad',
     section: 'methodology',
     isSystemRule: true,
@@ -159,8 +159,8 @@ export const SYSTEM_RULES: Rule[] = [
   },
   {
     id: 'disc-has-limitations',
-    label: 'Reconhece limitacoes',
-    description: 'Menciona limitacoes do estudo',
+    label: 'Reconhece limitações',
+    description: 'Menciona limitações do estudo',
     pattern: 'limitac|limites do estudo|reconhece-se|ressalva',
     section: 'discussion',
     isSystemRule: true,
@@ -170,7 +170,7 @@ export const SYSTEM_RULES: Rule[] = [
   // Conclusion rules
   {
     id: 'conc-has-synthesis',
-    label: 'Sintese dos resultados',
+    label: 'Síntese dos resultados',
     description: 'Resume os principais achados',
     pattern: 'conclui-se|foi possivel|os resultados|em sintese|em suma|portanto',
     section: 'conclusion',
@@ -263,11 +263,11 @@ export const DEFAULT_CHECKLISTS: Record<SectionType, Omit<ChecklistItem, 'status
     { id: 'title-keywords', label: 'Palavras-chave presentes', description: 'Contem termos que facilitam a busca', required: false, weight: 2 },
   ],
   abstract: [
-    { id: 'abstract-context', label: 'Contexto/Introducao', description: 'Apresenta o contexto do estudo', required: true, weight: 3 },
+    { id: 'abstract-context', label: 'Contexto/Introdução', description: 'Apresenta o contexto do estudo', required: true, weight: 3 },
     { id: 'abstract-objective', label: 'Objetivo', description: 'Objetivo da pesquisa esta claro', required: true, weight: 3 },
-    { id: 'abstract-method', label: 'Metodologia', description: 'Descreve brevemente o metodo usado', required: true, weight: 3 },
+    { id: 'abstract-method', label: 'Metodologia', description: 'Descreve brevemente o método usado', required: true, weight: 3 },
     { id: 'abstract-results', label: 'Resultados principais', description: 'Apresenta os principais achados', required: true, weight: 3 },
-    { id: 'abstract-conclusion', label: 'Conclusao', description: 'Conclui com as implicacoes do estudo', required: true, weight: 2 },
+    { id: 'abstract-conclusion', label: 'Conclusão', description: 'Conclui com as implicações do estudo', required: true, weight: 2 },
     { id: 'abstract-length', label: 'Tamanho adequado', description: 'Entre 150-300 palavras', required: false, weight: 1 },
   ],
   introduction: [
@@ -285,7 +285,7 @@ export const DEFAULT_CHECKLISTS: Record<SectionType, Omit<ChecklistItem, 'status
   'literature-review': [
     { id: 'lit-organization', label: 'Organizacao logica', description: 'Estrutura tematica ou cronologica clara', required: true, weight: 3 },
     { id: 'lit-coverage', label: 'Cobertura dos principais autores', description: 'Cita os autores mais relevantes da area', required: true, weight: 3 },
-    { id: 'lit-recent', label: 'Referencias recentes', description: 'Inclui publicacoes dos ultimos 5 anos', required: true, weight: 3 },
+    { id: 'lit-recent', label: 'Referências recentes', description: 'Inclui publicações dos últimos 5 anos', required: true, weight: 3 },
     { id: 'lit-synthesis', label: 'Sintese (nao apenas resumo)', description: 'Compara e contrasta diferentes autores', required: true, weight: 3 },
     { id: 'lit-comparison', label: 'Comparacao entre autores', description: 'Identifica convergencias e divergencias', required: true, weight: 2 },
     { id: 'lit-critical', label: 'Posicionamento critico', description: 'Avalia criticamente os estudos citados', required: false, weight: 2 },
@@ -308,12 +308,12 @@ export const DEFAULT_CHECKLISTS: Record<SectionType, Omit<ChecklistItem, 'status
     { id: 'method-alignment', label: 'Alinhamento com objetivos', description: 'Metodo adequado aos objetivos', required: true, weight: 3 },
   ],
   results: [
-    { id: 'results-objective', label: 'Apresentacao objetiva', description: 'Apresenta dados sem interpretacao', required: true, weight: 3 },
+    { id: 'results-objective', label: 'Apresentacao objetiva', description: 'Apresenta dados sem interpretação', required: true, weight: 3 },
     { id: 'results-organization', label: 'Organizacao por objetivo', description: 'Estrutura resultados por objetivo/hipotese', required: true, weight: 3 },
     { id: 'results-visuals', label: 'Uso de tabelas/graficos', description: 'Utiliza recursos visuais quando apropriado', required: false, weight: 2 },
-    { id: 'results-description', label: 'Descricao sem interpretacao', description: 'Descreve sem discutir implicacoes', required: true, weight: 2 },
+    { id: 'results-description', label: 'Descrição sem interpretação', description: 'Descreve sem discutir implicações', required: true, weight: 2 },
     { id: 'results-complete', label: 'Dados completos', description: 'Apresenta todos os dados relevantes', required: true, weight: 3 },
-    { id: 'results-references', label: 'Referencias a figuras/tabelas', description: 'Menciona figuras e tabelas no texto', required: false, weight: 1 },
+    { id: 'results-references', label: 'Referências a figuras/tabelas', description: 'Menciona figuras e tabelas no texto', required: false, weight: 1 },
   ],
   discussion: [
     { id: 'disc-interpretation', label: 'Interpretacao dos resultados', description: 'Explica o significado dos achados', required: true, weight: 3 },
@@ -334,23 +334,23 @@ export const DEFAULT_CHECKLISTS: Record<SectionType, Omit<ChecklistItem, 'status
   ],
   references: [
     { id: 'ref-format', label: 'Formatacao consistente', description: 'Segue um estilo (ABNT, APA, etc)', required: true, weight: 3 },
-    { id: 'ref-complete', label: 'Referencias completas', description: 'Todas as citacoes tem referencia', required: true, weight: 3 },
-    { id: 'ref-recent', label: 'Referencias atualizadas', description: 'Maioria dos ultimos 10 anos', required: false, weight: 2 },
+    { id: 'ref-complete', label: 'Referências completas', description: 'Todas as citações tem referencia', required: true, weight: 3 },
+    { id: 'ref-recent', label: 'Referências atualizadas', description: 'Maioria dos últimos 10 anos', required: false, weight: 2 },
     { id: 'ref-alphabetical', label: 'Ordem alfabetica', description: 'Lista em ordem alfabetica', required: true, weight: 1 },
   ],
 };
 
 // Section labels in Portuguese
 export const SECTION_LABELS: Record<SectionType, string> = {
-  title: 'Titulo',
+  title: 'Título',
   abstract: 'Resumo',
-  introduction: 'Introducao',
+  introduction: 'Introdução',
   'literature-review': 'Revisao de Literatura',
   methodology: 'Metodologia',
   results: 'Resultados',
-  discussion: 'Discussao',
-  conclusion: 'Conclusao',
-  references: 'Referencias',
+  discussion: 'Discussão',
+  conclusion: 'Conclusão',
+  references: 'Referências',
 };
 
 // Priority colors

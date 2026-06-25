@@ -7,6 +7,7 @@ import { db } from "../db.js";
 import { requireAuth } from "../auth.js";
 import { heavyLimiter } from "../lib/rate-limit.js";
 import { isSafeRelPath } from "../lib/safe-path.js";
+import { isStorageConfigured, uploadPdf, downloadPdf, deletePdf } from "../lib/storage.js";
 
 export const buildRouter = Router({ mergeParams: true });
 
@@ -20,7 +21,7 @@ interface BuildFile {
 
 interface BuildResult {
   success: boolean;
-  pdfPath?: string;
+  pdfBuffer?: Buffer;
   logs?: string;
   error?: string;
 }
@@ -54,27 +55,42 @@ buildRouter.post("/", heavyLimiter, async (req, res) => {
     try {
       const result = await runPandocBuild(project.files);
 
-      if (result.success && result.pdfPath) {
-        const pdfBuffer = await readFile(result.pdfPath);
-        const pdfDataUrl = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
+      if (result.success && result.pdfBuffer) {
+        const pdfBuffer = result.pdfBuffer;
+        const asDataUrl = () => `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
+        let pdfRef: string;
+        if (isStorageConfigured()) {
+          const key = `builds/${id}/${build.id}.pdf`;
+          try {
+            await uploadPdf(key, pdfBuffer);
+            pdfRef = key;
+          } catch (uploadError) {
+            console.error("B2 upload failed, falling back to base64:", uploadError);
+            pdfRef = asDataUrl();
+          }
+        } else {
+          pdfRef = asDataUrl();
+        }
 
         const completedBuild = await db.build.update({
           where: { id: build.id },
           data: {
             status: "COMPLETED",
             completedAt: new Date(),
-            durationMs: Date.now() - build.queuedAt.getTime(),
-            pdfUrl: pdfDataUrl,
+            durationMs: Date.now() - (build.startedAt ?? build.queuedAt).getTime(),
+            pdfUrl: pdfRef,
             pdfSizeBytes: pdfBuffer.length,
             logs: result.logs || "PDF generated with pandoc",
           },
         });
 
-        return res.json({
+        res.json({
           build: { id: completedBuild.id, status: completedBuild.status, pdfSizeBytes: completedBuild.pdfSizeBytes },
           pdfPath: `/api/projects/${id}/build/${completedBuild.id}/pdf`,
           message: "Build completed successfully",
         });
+        pruneBuilds(id).catch((e) => console.error("Build prune failed:", e));
+        return;
       }
       throw new Error(result.error || "Build failed");
     } catch (buildError) {
@@ -134,7 +150,12 @@ buildRouter.get("/:buildId/pdf", async (req, res) => {
     if (!build?.pdfUrl) {
       return res.status(404).json({ error: "PDF not found" });
     }
-    const buffer = Buffer.from(build.pdfUrl.split(",", 2)[1] || "", "base64");
+    const buffer = build.pdfUrl.startsWith("data:")
+      ? Buffer.from(build.pdfUrl.split(",", 2)[1] || "", "base64")
+      : await downloadPdf(build.pdfUrl);
+    if (!buffer || buffer.length === 0) {
+      return res.status(404).json({ error: "PDF not found" });
+    }
     const safeName = project.name.replace(/[^a-zA-Z0-9-_]+/g, "_") || "documento";
     const disposition = req.query.download ? "attachment" : "inline";
     res.setHeader("Content-Type", "application/pdf");
@@ -146,15 +167,35 @@ buildRouter.get("/:buildId/pdf", async (req, res) => {
   }
 });
 
-async function runPandocBuild(files: BuildFile[]): Promise<BuildResult> {
+export async function pruneBuilds(projectId: string, keep = 10) {
+  const stale = await db.build.findMany({
+    where: { projectId },
+    orderBy: { queuedAt: "desc" },
+    skip: keep,
+    select: { id: true, pdfUrl: true },
+  });
+  if (stale.length === 0) return;
+  if (isStorageConfigured()) {
+    await Promise.all(
+      stale
+        .filter((b) => b.pdfUrl && !b.pdfUrl.startsWith("data:"))
+        .map((b) => deletePdf(b.pdfUrl as string).catch(() => {}))
+    );
+  }
+  await db.build.deleteMany({ where: { id: { in: stale.map((b) => b.id) } } });
+}
+
+async function runPandocBuild(allFiles: BuildFile[]): Promise<BuildResult> {
+  const files = allFiles.filter((f) => isSafeRelPath(f.path));
   const dir = await mkdtemp(path.join(tmpdir(), "skywrite-build-"));
   try {
     for (const file of files) {
-      if (!isSafeRelPath(file.path)) continue;
       const filePath = path.join(dir, file.path);
       await mkdir(path.dirname(filePath), { recursive: true });
       if (file.type === "IMAGE") {
-        await writeFile(filePath, Buffer.from(file.content || "", "base64"));
+        const b64 = (file.content || "").replace(/^data:[^,]*,/, "").trim();
+        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(b64)) continue;
+        await writeFile(filePath, Buffer.from(b64, "base64"));
       } else {
         await writeFile(filePath, file.content || "");
       }
@@ -179,7 +220,6 @@ async function runPandocBuild(files: BuildFile[]): Promise<BuildResult> {
 
     const pdfPath = path.join(dir, "output.pdf");
     const args = [
-      ...markdownFiles,
       "--citeproc",
       "--toc",
       "--metadata",
@@ -194,12 +234,17 @@ async function runPandocBuild(files: BuildFile[]): Promise<BuildResult> {
     ];
     if (metadataFile) args.push(`--metadata-file=${metadataFile.path}`);
     if (bibFile) args.push(`--bibliography=${bibFile.path}`);
+    args.push("--", ...markdownFiles);
 
     const result = await runPandoc(args, dir);
-    if (result.code === 0) {
-      return { success: true, pdfPath, logs: result.output };
+    if (result.code !== 0) {
+      return { success: false, error: result.output || "pandoc failed", logs: result.output };
     }
-    return { success: false, error: result.output || "pandoc failed", logs: result.output };
+    const pdfBuffer = await readFile(pdfPath);
+    if (pdfBuffer.length === 0) {
+      return { success: false, error: "PDF gerado vazio", logs: result.output };
+    }
+    return { success: true, pdfBuffer, logs: result.output };
   } finally {
     rm(dir, { recursive: true, force: true }).catch(() => {});
   }

@@ -5,7 +5,7 @@ import * as path from "path";
 
 function runPandoc(args: string[], cwd: string) {
   return new Promise<number>((resolve) => {
-    const pandoc = spawn("pandoc", args, { cwd, detached: true });
+    const pandoc = spawn("pandoc", args, { cwd, detached: true, stdio: "ignore" });
     let settled = false;
     const finish = (code: number) => {
       if (settled) return;

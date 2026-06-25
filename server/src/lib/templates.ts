@@ -30,6 +30,8 @@ export interface TemplateDefaultFile {
 
 const TEMPLATES_DIR = path.join(process.cwd(), "templates");
 
+const isValidTemplateId = (id: string) => /^[a-z0-9-]+$/.test(id);
+
 /**
  * Get all available templates
  */
@@ -63,6 +65,7 @@ export async function getTemplates(): Promise<TemplateMetadata[]> {
  * Get a specific template by ID
  */
 export async function getTemplate(id: string): Promise<TemplateMetadata | null> {
+  if (!isValidTemplateId(id)) return null;
   try {
     const templatePath = path.join(TEMPLATES_DIR, id, "template.json");
     const content = await fs.readFile(templatePath, "utf-8");
@@ -76,6 +79,7 @@ export async function getTemplate(id: string): Promise<TemplateMetadata | null> 
  * Get default files for a template
  */
 export async function getTemplateDefaultFiles(id: string): Promise<TemplateDefaultFile[]> {
+  if (!isValidTemplateId(id)) return [];
   const defaultFilesDir = path.join(TEMPLATES_DIR, id, "default-files");
   const files: TemplateDefaultFile[] = [];
 
@@ -120,6 +124,7 @@ export async function getTemplateDefaultFiles(id: string): Promise<TemplateDefau
  * Get LaTeX files for a template (preamble, template, etc.)
  */
 export async function getTemplateLatexFiles(id: string): Promise<{ preamble?: string; template?: string }> {
+  if (!isValidTemplateId(id)) return {};
   const latexDir = path.join(TEMPLATES_DIR, id, "latex");
   const result: { preamble?: string; template?: string } = {};
 

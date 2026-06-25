@@ -2,6 +2,12 @@ import { Router } from "express";
 import { db } from "../db.js";
 import { requireAuth } from "../auth.js";
 import { analyzeThesis } from "../lib/thesis-analysis.js";
+import {
+  readability,
+  findUndefinedAcronyms,
+  findSpellingVariants,
+  findNumberFormatIssues,
+} from "../lib/writing-metrics.js";
 
 export const analyzeRouter = Router({ mergeParams: true });
 
@@ -19,7 +25,7 @@ analyzeRouter.post("/", async (req, res) => {
       return res.status(404).json({ error: "Project not found" });
     }
 
-    const allContent = project.files.map((f) => f.content || "").join("\n\n");
+    const allContent = project.files.map((f) => f.content || "").join("\n\n").slice(0, 2_000_000);
     if (!allContent.trim()) {
       return res.status(400).json({ error: "No content to analyze" });
     }
@@ -29,6 +35,12 @@ analyzeRouter.post("/", async (req, res) => {
     return res.json({
       success: true,
       analysis,
+      metrics: readability(allContent),
+      consistency: {
+        undefinedAcronyms: findUndefinedAcronyms(allContent),
+        spellingVariants: findSpellingVariants(allContent),
+        numberFormatIssues: findNumberFormatIssues(allContent),
+      },
       analyzedAt: new Date().toISOString(),
     });
   } catch (error) {

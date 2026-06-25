@@ -15,28 +15,26 @@ async function main() {
       name: "Demo User",
       passwordHash,
       emailVerified: new Date(),
-      subscriptionStatus: "PRO",
     },
   });
 
   console.log("Demo user created:", demoUser.email);
 
   // Create a sample project for the demo user
+  const demoMeta = {
+    name: "Tese: IA no Ensino de Línguas",
+    description: "Estudo sobre aplicações de Inteligência Artificial no ensino de línguas estrangeiras",
+    title: "Inteligência Artificial no Ensino de Línguas Estrangeiras",
+    subtitle: "Um Estudo sobre Aplicações e Impactos",
+    author: "Demo User",
+    university: "Universidade Federal do Rio Grande do Sul",
+    degree: "Doutorado em Linguística Aplicada",
+    language: "pt-BR",
+  };
   const project = await prisma.project.upsert({
     where: { storageKey: `${demoUser.id}/demo-thesis` },
-    update: {},
-    create: {
-      userId: demoUser.id,
-      name: "Tese: IA no Ensino de Línguas",
-      description: "Estudo sobre aplicações de Inteligência Artificial no ensino de línguas estrangeiras",
-      title: "Inteligência Artificial no Ensino de Línguas Estrangeiras",
-      subtitle: "Um Estudo sobre Aplicações e Impactos",
-      author: "Demo User",
-      university: "Universidade Federal do Rio Grande do Sul",
-      degree: "Doutorado em Linguística Aplicada",
-      language: "pt-BR",
-      storageKey: `${demoUser.id}/demo-thesis`,
-    },
+    update: demoMeta,
+    create: { userId: demoUser.id, ...demoMeta, storageKey: `${demoUser.id}/demo-thesis` },
   });
 
   console.log("Demo project created:", project.name);

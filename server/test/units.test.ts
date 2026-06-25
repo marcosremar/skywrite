@@ -56,6 +56,17 @@ describe("parseBibTeX", () => {
     expect(entries[0].doi).toBe("10.2307/3586393");
     expect(entries[1].type).toBe("book");
   });
+  test("handles nested braces in field values", () => {
+    const entries = parseBibTeX(`@article{x, title = {The {LaTeX} Companion}, year = {2020}}`);
+    expect(entries.length).toBe(1);
+    expect(entries[0].title).toBe("The {LaTeX} Companion");
+    expect(entries[0].year).toBe("2020");
+  });
+  test("parses entry ending without trailing newline", () => {
+    const entries = parseBibTeX(`@book{y, title = {Solo}}`);
+    expect(entries.length).toBe(1);
+    expect(entries[0].title).toBe("Solo");
+  });
 });
 
 describe("parseResearchResponse", () => {

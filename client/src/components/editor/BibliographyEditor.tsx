@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Trash2, Edit2, ChevronDown, ChevronUp } from "lucide-react";
+import { PlusCircle, Trash2, Edit2, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { apiFetch } from "@/lib/apiFetch";
 
 interface Citation {
   key: string;
@@ -28,22 +29,83 @@ interface Citation {
   doi?: string;
   url?: string;
   abstract?: string;
+  extra?: Record<string, string>;
+}
+
+const KNOWN_FIELDS = [
+  "title", "author", "year", "journal", "booktitle", "publisher",
+  "volume", "number", "pages", "doi", "url", "abstract",
+];
+
+function parseEntryFields(body: string): Record<string, string> {
+  const fields: Record<string, string> = {};
+  let i = 0;
+  const n = body.length;
+  while (i < n) {
+    while (i < n && /[\s,]/.test(body[i])) i++;
+    const start = i;
+    while (i < n && /[A-Za-z0-9_+:-]/.test(body[i])) i++;
+    const name = body.slice(start, i).toLowerCase();
+    while (i < n && /\s/.test(body[i])) i++;
+    if (!name || body[i] !== "=") {
+      while (i < n && body[i] !== ",") i++;
+      continue;
+    }
+    i++;
+    while (i < n && /\s/.test(body[i])) i++;
+    let value = "";
+    if (body[i] === "{") {
+      let depth = 0;
+      while (i < n) {
+        const ch = body[i];
+        if (ch === "{") {
+          depth++;
+          if (depth > 1) value += ch;
+        } else if (ch === "}") {
+          depth--;
+          if (depth === 0) {
+            i++;
+            break;
+          }
+          value += ch;
+        } else {
+          value += ch;
+        }
+        i++;
+      }
+    } else if (body[i] === '"') {
+      i++;
+      while (i < n && body[i] !== '"') {
+        value += body[i];
+        i++;
+      }
+      i++;
+    } else {
+      while (i < n && body[i] !== "," && !/\s/.test(body[i])) {
+        value += body[i];
+        i++;
+      }
+    }
+    if (!(name in fields)) fields[name] = value.replace(/\s+/g, " ").trim();
+  }
+  return fields;
 }
 
 interface BibliographyEditorProps {
   bibContent: string;
   onSave: (content: string) => void;
+  projectId: string;
 }
 
 // Reference type options with labels
 const REFERENCE_TYPES = [
-  { value: "article", label: "Artigo de Periodico" },
+  { value: "article", label: "Artigo de Periódico" },
   { value: "book", label: "Livro" },
-  { value: "inproceedings", label: "Artigo de Conferencia" },
-  { value: "incollection", label: "Capitulo de Livro" },
+  { value: "inproceedings", label: "Artigo de Conferência" },
+  { value: "incollection", label: "Capítulo de Livro" },
   { value: "phdthesis", label: "Tese de Doutorado" },
-  { value: "mastersthesis", label: "Dissertacao de Mestrado" },
-  { value: "techreport", label: "Relatorio Tecnico" },
+  { value: "mastersthesis", label: "Dissertação de Mestrado" },
+  { value: "techreport", label: "Relatório Técnico" },
   { value: "misc", label: "Outros" },
 ];
 
@@ -61,29 +123,30 @@ function parseBibTeX(content: string): Citation[] {
 
     if (type === "comment") continue;
 
-    const getField = (name: string): string | undefined => {
-      const regex = new RegExp(`${name}\\s*=\\s*\\{([^}]*)\\}`, "i");
-      const altRegex = new RegExp(`${name}\\s*=\\s*"([^"]*)"`, "i");
-      const numRegex = new RegExp(`${name}\\s*=\\s*(\\d+)`, "i");
-      const m = entry.match(regex) || entry.match(altRegex) || entry.match(numRegex);
-      return m?.[1]?.trim();
-    };
+    const braceIdx = entry.indexOf("{");
+    const commaIdx = braceIdx === -1 ? -1 : entry.indexOf(",", braceIdx);
+    const fields = commaIdx === -1 ? {} : parseEntryFields(entry.slice(commaIdx + 1));
+    const extra: Record<string, string> = {};
+    for (const [k, v] of Object.entries(fields)) {
+      if (!KNOWN_FIELDS.includes(k)) extra[k] = v;
+    }
 
     citations.push({
       key,
       type,
-      title: getField("title") || "",
-      author: getField("author") || "",
-      year: getField("year") || "",
-      journal: getField("journal"),
-      booktitle: getField("booktitle"),
-      publisher: getField("publisher"),
-      volume: getField("volume"),
-      number: getField("number"),
-      pages: getField("pages"),
-      doi: getField("doi"),
-      url: getField("url"),
-      abstract: getField("abstract"),
+      title: fields.title || "",
+      author: fields.author || "",
+      year: fields.year || "",
+      journal: fields.journal,
+      booktitle: fields.booktitle,
+      publisher: fields.publisher,
+      volume: fields.volume,
+      number: fields.number,
+      pages: fields.pages,
+      doi: fields.doi,
+      url: fields.url,
+      abstract: fields.abstract,
+      extra: Object.keys(extra).length ? extra : undefined,
     });
   }
 
@@ -108,6 +171,11 @@ function toBibTeX(citations: Citation[]): string {
       if (c.doi) fields.push(`  doi = {${c.doi}}`);
       if (c.url) fields.push(`  url = {${c.url}}`);
       if (c.abstract) fields.push(`  abstract = {${c.abstract}}`);
+      if (c.extra) {
+        for (const [k, v] of Object.entries(c.extra)) {
+          if (v) fields.push(`  ${k} = {${v}}`);
+        }
+      }
 
       return `@${c.type}{${c.key},\n${fields.join(",\n")}\n}`;
     })
@@ -117,8 +185,9 @@ function toBibTeX(citations: Citation[]): string {
 // Format citation for display
 function formatCitation(citation: Citation): string {
   const authors = citation.author.split(" and ")[0];
-  const lastName = authors.split(",")[0] || authors.split(" ").pop();
-  return `${lastName} (${citation.year})`;
+  const lastName = authors.split(",")[0] || authors.split(" ").pop() || citation.key;
+  const year = citation.year || "s.d.";
+  return `${lastName} (${year})`;
 }
 
 // Get type label
@@ -161,7 +230,7 @@ function CitationForm({
               {getTypeLabel(citation.type)}
             </span>
           </div>
-          <p className="text-sm font-medium truncate mt-1 text-foreground">{citation.title || "Sem titulo"}</p>
+          <p className="text-sm font-medium truncate mt-1 text-foreground">{citation.title || "Sem título"}</p>
           <p className="text-xs text-muted-foreground truncate">{formatCitation(citation)}</p>
         </div>
         <Button
@@ -185,6 +254,7 @@ function CitationForm({
               </label>
               <input
                 type="text"
+                aria-label="Chave da referência"
                 value={citation.key}
                 onChange={(e) => updateField("key", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
@@ -193,9 +263,10 @@ function CitationForm({
             </div>
             <div>
               <label className="block text-xs font-medium text-foreground mb-1">
-                Tipo de Referencia
+                Tipo de Referência
               </label>
               <select
+                aria-label="Tipo de referência"
                 value={citation.type}
                 onChange={(e) => updateField("type", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
@@ -212,14 +283,15 @@ function CitationForm({
           {/* Row 2: Title */}
           <div>
             <label className="block text-xs font-medium text-foreground mb-1">
-              Titulo
+              Título
             </label>
             <input
               type="text"
+              aria-label="Título da obra"
               value={citation.title}
               onChange={(e) => updateField("title", e.target.value)}
               className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
-              placeholder="Titulo da obra"
+              placeholder="Título da obra"
             />
           </div>
 
@@ -231,6 +303,7 @@ function CitationForm({
               </label>
               <input
                 type="text"
+                aria-label="Autores"
                 value={citation.author}
                 onChange={(e) => updateField("author", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
@@ -256,14 +329,14 @@ function CitationForm({
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-foreground mb-1">
-                  Periodico
+                  Periódico
                 </label>
                 <input
                   type="text"
                   value={citation.journal || ""}
                   onChange={(e) => updateField("journal", e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
-                  placeholder="Nome do periodico"
+                  placeholder="Nome do periódico"
                 />
               </div>
               <div>
@@ -284,14 +357,14 @@ function CitationForm({
           {(citation.type === "inproceedings") && (
             <div>
               <label className="block text-xs font-medium text-foreground mb-1">
-                Nome da Conferencia
+                Nome da Conferência
               </label>
               <input
                 type="text"
                 value={citation.booktitle || ""}
                 onChange={(e) => updateField("booktitle", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground"
-                placeholder="Nome da conferencia ou evento"
+                placeholder="Nome da conferência ou evento"
               />
             </div>
           )}
@@ -315,7 +388,7 @@ function CitationForm({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-foreground mb-1">
-                Paginas
+                Páginas
               </label>
               <input
                 type="text"
@@ -358,12 +431,75 @@ function CitationForm({
   );
 }
 
-export function BibliographyEditor({ bibContent, onSave }: BibliographyEditorProps) {
+export function BibliographyEditor({ bibContent, onSave, projectId }: BibliographyEditorProps) {
   const [citations, setCitations] = useState<Citation[]>(() => parseBibTeX(bibContent));
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("visual");
   const [rawContent, setRawContent] = useState(bibContent);
+  const [doi, setDoi] = useState("");
+  const [doiLoading, setDoiLoading] = useState(false);
+  const [doiError, setDoiError] = useState("");
+  const [risText, setRisText] = useState("");
+  const [risOpen, setRisOpen] = useState(false);
+  const [risLoading, setRisLoading] = useState(false);
+
+  const handleRisImport = async () => {
+    if (!risText.trim()) return;
+    setRisLoading(true);
+    try {
+      const res = await apiFetch(`/api/projects/${projectId}/citations/ris`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ris: risText }),
+      });
+      if (res.ok) {
+        const { bibtex } = await res.json();
+        const merged = `${rawContent}\n\n${bibtex}`.trim();
+        setRawContent(merged);
+        setCitations(parseBibTeX(merged));
+        setRisText("");
+        setRisOpen(false);
+      }
+    } finally {
+      setRisLoading(false);
+    }
+  };
+
+  const handleDoiLookup = async () => {
+    if (!doi.trim()) return;
+    setDoiLoading(true);
+    setDoiError("");
+    try {
+      const res = await apiFetch(`/api/projects/${projectId}/citations/doi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doi }),
+      });
+      if (res.ok) {
+        const { bibtex } = await res.json();
+        const merged = `${rawContent}\n\n${bibtex}`.trim();
+        setRawContent(merged);
+        setCitations(parseBibTeX(merged));
+        setDoi("");
+      } else {
+        setDoiError("DOI não encontrado");
+      }
+    } catch {
+      setDoiError("Falha ao buscar DOI");
+    } finally {
+      setDoiLoading(false);
+    }
+  };
+
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      setCitations(parseBibTeX(bibContent));
+      setRawContent(bibContent);
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, bibContent]);
 
   const filteredCitations = useMemo(
     () =>
@@ -420,33 +556,72 @@ export function BibliographyEditor({ bibContent, onSave }: BibliographyEditorPro
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          Referencias ({citations.length})
+          Referências ({citations.length})
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl w-[95vw] h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="flex-shrink-0 px-6 py-4 border-b">
-          <DialogTitle>Gerenciar Referencias Bibliograficas</DialogTitle>
+          <DialogTitle>Gerenciar Referências Bibliográficas</DialogTitle>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col min-h-0 overflow-hidden px-6">
           <TabsList className="flex-shrink-0 mt-4">
             <TabsTrigger value="visual">Editor Visual</TabsTrigger>
-            <TabsTrigger value="raw">Codigo BibTeX</TabsTrigger>
+            <TabsTrigger value="raw">Código BibTeX</TabsTrigger>
           </TabsList>
 
           <TabsContent value="visual" className="flex-1 flex flex-col min-h-0 mt-4 overflow-hidden">
+            <div className="flex gap-2 mb-2 flex-shrink-0">
+              <input
+                type="text"
+                placeholder="Colar DOI para importar (ex.: 10.2307/3586393)"
+                value={doi}
+                onChange={(e) => setDoi(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleDoiLookup()}
+                className="flex-1 px-3 py-2 border border-border rounded-md text-sm bg-input text-foreground"
+              />
+              <Button onClick={handleDoiLookup} size="sm" variant="outline" disabled={doiLoading || !doi.trim()}>
+                {doiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Importar DOI"}
+              </Button>
+            </div>
+            {doiError && <p className="text-xs text-destructive mb-2 flex-shrink-0">{doiError}</p>}
+
+            <div className="mb-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setRisOpen((v) => !v)}
+                className="text-xs text-primary hover:underline"
+              >
+                {risOpen ? "Ocultar import RIS" : "Importar de arquivo RIS (Zotero/Mendeley)"}
+              </button>
+              {risOpen && (
+                <div className="mt-2 space-y-2">
+                  <textarea
+                    value={risText}
+                    onChange={(e) => setRisText(e.target.value)}
+                    placeholder="Cole o conteúdo .ris aqui"
+                    className="w-full h-24 px-3 py-2 border border-border rounded-md text-sm bg-input text-foreground font-mono"
+                  />
+                  <Button onClick={handleRisImport} size="sm" variant="outline" disabled={risLoading || !risText.trim()}>
+                    {risLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Importar RIS"}
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {/* Search and Add */}
             <div className="flex gap-2 mb-4 flex-shrink-0">
               <input
                 type="text"
-                placeholder="Buscar referencias..."
+                aria-label="Buscar referências"
+                placeholder="Buscar referências..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="flex-1 px-3 py-2 border border-border rounded-md text-sm bg-input text-foreground"
               />
               <Button onClick={handleAddCitation} size="sm">
                 <PlusCircle className="h-4 w-4 mr-2" />
-                Nova Referencia
+                Nova Referência
               </Button>
             </div>
 
@@ -455,32 +630,23 @@ export function BibliographyEditor({ bibContent, onSave }: BibliographyEditorPro
               <div className="space-y-3 pb-4">
                 {filteredCitations.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-sm">Nenhuma referencia encontrada</p>
+                    <p className="text-sm">Nenhuma referência encontrada</p>
                     <Button
                       variant="outline"
                       size="sm"
                       className="mt-4"
                       onClick={handleAddCitation}
                     >
-                      Adicionar primeira referencia
+                      Adicionar primeira referência
                     </Button>
                   </div>
                 ) : (
                   filteredCitations.map((citation, index) => (
                     <CitationForm
-                      key={citation.key + index}
+                      key={index}
                       citation={citation}
-                      onChange={(updated) =>
-                        handleUpdateCitation(
-                          citations.findIndex((c) => c.key === citation.key),
-                          updated
-                        )
-                      }
-                      onDelete={() =>
-                        handleDeleteCitation(
-                          citations.findIndex((c) => c.key === citation.key)
-                        )
-                      }
+                      onChange={(updated) => handleUpdateCitation(citations.indexOf(citation), updated)}
+                      onDelete={() => handleDeleteCitation(citations.indexOf(citation))}
                     />
                   ))
                 )}
@@ -491,7 +657,7 @@ export function BibliographyEditor({ bibContent, onSave }: BibliographyEditorPro
               <p className="font-medium mb-1">Como citar no texto:</p>
               <p>
                 Use <code className="bg-secondary px-1 rounded">[@chave]</code> para inserir
-                uma citacao. Ex: <code className="bg-secondary px-1 rounded">[@{filteredCitations[0]?.key || "silva2023"}]</code>
+                uma citação. Ex: <code className="bg-secondary px-1 rounded">[@{filteredCitations[0]?.key || "silva2023"}]</code>
               </p>
             </div>
           </TabsContent>
@@ -505,7 +671,7 @@ export function BibliographyEditor({ bibContent, onSave }: BibliographyEditorPro
               spellCheck={false}
             />
             <p className="mt-2 text-xs text-muted-foreground flex-shrink-0">
-              Edite diretamente o codigo BibTeX se preferir
+              Edite diretamente o código BibTeX se preferir
             </p>
           </TabsContent>
         </Tabs>
@@ -518,7 +684,7 @@ export function BibliographyEditor({ bibContent, onSave }: BibliographyEditorPro
             <Button variant="outline" onClick={() => setIsOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSave}>Salvar Referencias</Button>
+            <Button onClick={handleSave}>Salvar Referências</Button>
           </div>
         </div>
       </DialogContent>
@@ -552,18 +718,19 @@ export function CitationPicker({ citations, onInsert }: CitationPickerProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" title="Inserir citacao">
+        <Button variant="ghost" size="sm" title="Inserir citação">
           Citar
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg w-[90vw] max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Inserir Citacao</DialogTitle>
+          <DialogTitle>Inserir Citação</DialogTitle>
         </DialogHeader>
 
         <input
           type="text"
-          placeholder="Buscar por autor, titulo ou chave..."
+          aria-label="Buscar por autor, título ou chave"
+          placeholder="Buscar por autor, título ou chave..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full px-3 py-2 border border-border rounded-md text-sm mb-4 bg-input text-foreground"
@@ -587,7 +754,7 @@ export function CitationPicker({ citations, onInsert }: CitationPickerProps) {
             ))}
             {filteredCitations.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">
-                Nenhuma citacao encontrada
+                Nenhuma citação encontrada
               </p>
             )}
           </div>

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { apiFetch, encodePath } from "@/lib/apiFetch";
+import { findReferencingFiles } from "@/lib/file-refs";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MoreVertical, Edit2, Copy, Trash2, FilePlus } from "lucide-react";
+import { toast } from "sonner";
 import type { ProjectFile } from "@/types/models";
 
 interface FileTreeProps {
@@ -72,6 +74,7 @@ export function FileTree({
   } | null>(null);
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [newFileDir, setNewFileDir] = useState("");
+  const creatingRef = useRef(false);
   const [newFileNameInput, setNewFileNameInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -127,24 +130,6 @@ export function FileTree({
     }
   };
 
-  // Check if any other files reference this file
-  const findReferencingFiles = (filePath: string): string[] => {
-    const fileName = filePath.split("/").pop() || "";
-    const referencingFilePaths: string[] = [];
-
-    files.forEach((file) => {
-      if (file.path === filePath) return;
-      if (!file.content) return;
-
-      // Check for references in markdown files
-      if (file.content.includes(fileName) || file.content.includes(filePath)) {
-        referencingFilePaths.push(file.path);
-      }
-    });
-
-    return referencingFilePaths;
-  };
-
   const handleStartRename = (file: ProjectFile) => {
     setEditingFileId(file.id);
     setNewFileName(file.name);
@@ -159,9 +144,13 @@ export function FileTree({
       setEditingFileId(null);
       return;
     }
+    if (/[/\\]/.test(newFileName)) {
+      toast.error("O nome não pode conter / ou \\");
+      return;
+    }
 
     // Check for references
-    const refs = findReferencingFiles(file.path);
+    const refs = findReferencingFiles(files, file.path);
     if (refs.length > 0) {
       setReferencingFiles(refs);
       setPendingRename({ file, newName: newFileName });
@@ -195,9 +184,14 @@ export function FileTree({
       if (response.ok) {
         const { file: updatedFile } = await response.json();
         onFileRenamed?.(updatedFile);
+      } else if (response.status === 409) {
+        toast.error("Já existe um arquivo com esse nome");
+      } else {
+        toast.error("Não foi possível renomear o arquivo");
       }
     } catch (error) {
       console.error("Error renaming file:", error);
+      toast.error("Falha ao renomear");
     } finally {
       setEditingFileId(null);
       setPendingRename(null);
@@ -257,15 +251,23 @@ export function FileTree({
       if (response.ok) {
         const { file: newFile } = await response.json();
         onFileCreated?.(newFile);
+      } else {
+        toast.error("Não foi possível duplicar o arquivo");
       }
     } catch (error) {
       console.error("Error duplicating file:", error);
+      toast.error("Falha ao duplicar arquivo");
     }
   };
 
   const handleCreateFile = async () => {
+    if (creatingRef.current) return;
     if (!newFileNameInput.trim()) {
       setIsCreatingFile(false);
+      return;
+    }
+    if (/[\\]/.test(newFileNameInput)) {
+      toast.error("O nome não pode conter \\");
       return;
     }
 
@@ -273,6 +275,7 @@ export function FileTree({
       ? `${newFileDir}/${newFileNameInput}`
       : newFileNameInput;
 
+    creatingRef.current = true;
     try {
       const response = await apiFetch(`/api/projects/${projectId}/files`, {
         method: "POST",
@@ -294,10 +297,16 @@ export function FileTree({
       if (response.ok) {
         const { file } = await response.json();
         onFileCreated?.(file);
+      } else if (response.status === 409) {
+        toast.error("Já existe um arquivo com esse nome");
+      } else {
+        toast.error("Não foi possível criar o arquivo");
       }
     } catch (error) {
       console.error("Error creating file:", error);
+      toast.error("Falha ao criar arquivo");
     } finally {
+      creatingRef.current = false;
       setIsCreatingFile(false);
       setNewFileNameInput("");
       setNewFileDir("");
@@ -372,8 +381,17 @@ export function FileTree({
                 <ContextMenu key={file.id}>
                   <ContextMenuTrigger asChild>
                     <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label={file.name}
                       onClick={() => onSelect(file)}
                       onDoubleClick={() => handleDoubleClick(file)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onSelect(file);
+                        }
+                      }}
                       className={cn(
                         "w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md hover:bg-accent transition-colors text-left cursor-pointer group",
                         selectedFile?.id === file.id &&
@@ -396,12 +414,13 @@ export function FileTree({
                         />
                       ) : (
                         <>
-                          <span className="truncate flex-1">{file.name}</span>
+                          <span className="truncate flex-1" title={file.name}>{file.name}</span>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                aria-label="Ações do arquivo"
                                 className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
                                 onClick={(e) => {
                                   e.stopPropagation();

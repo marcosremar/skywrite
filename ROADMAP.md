@@ -101,7 +101,9 @@ Fechar buracos de segurança e legais para operar um SaaS pago com dados pessoai
 
 ## Fora de escopo (pós-MVP, decisão explícita)
 
-Billing real (Stripe) e enforcement de cota · reset/verificação de senha por e-mail · provider LLM secundário/circuit breaker · streaming (SSE) do Orientador · cache de respostas do LLM e verificação fuzzy de citações · object storage (S3/R2) · editor totalmente funcional em mobile (MVP só evita a tela quebrada) · acessibilidade completa (WCAG) · paginação/lazy-load · remoção das tabelas mortas do schema + envelope de erro com zod · allowlist open-access/robots.txt/SSRF na ingestão · TTL/cleanup do cache Paper · CSRF explícito/helmet/logger estruturado · exportação de dados (portabilidade LGPD) · limpeza dos arquivos legados windsurf/ssh/indyserve · vitest no client + mock do ai-gateway.
+**Entregue pós-MVP nesta fase:** object storage (B2/S3-compat) · remoção das tabelas mortas do schema · TTL/cleanup do cache Paper · `helmet` · exportação de dados (portabilidade LGPD) · limpeza dos arquivos legados windsurf/indyserve · vitest no client + mock do ai-gateway · code-splitting (lazy routes) · SSRF (privados/metadata/IPv4-mapped) · camada de revisão acadêmica (gramática LanguageTool, integridade/ABNT de citações, DOI/RIS→BibTeX, métricas, prontidão de submissão, assistente LLM, integração de provedor de originalidade).
+
+**Ainda fora de escopo:** Billing real (Stripe) e enforcement de cota · reset/verificação de senha por e-mail · provider LLM secundário/circuit breaker · streaming (SSE) do Orientador · cache de respostas do LLM e verificação fuzzy de citações · editor totalmente funcional em mobile · acessibilidade completa (WCAG) · paginação/lazy-load de listas · envelope de erro com zod · allowlist open-access/robots.txt na ingestão · CSRF explícito/logger estruturado · detector próprio de plágio/IA (corpus).
 
 ## Lógica de sequenciamento
 

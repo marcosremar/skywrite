@@ -33,7 +33,7 @@ function readUserId(req: Request): string | null {
   const token = req.cookies?.[TOKEN_COOKIE];
   if (!token) return null;
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as { sub?: string };
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] }) as { sub?: string };
     return payload.sub ?? null;
   } catch {
     return null;
