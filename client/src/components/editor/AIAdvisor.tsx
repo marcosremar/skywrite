@@ -943,6 +943,7 @@ type VerdictClass = "supported" | "partial" | "unsupported" | "uncertain";
 interface ChatVerdict {
   claim: string;
   classification: VerdictClass;
+  confidence?: number;
   evidence: string;
   source: number | null;
 }
@@ -961,6 +962,123 @@ const VERDICT_STYLE: Record<VerdictClass, { label: string; cls: string }> = {
   uncertain: { label: "Incerta", cls: "bg-muted text-muted-foreground" },
 };
 
+interface ProjectSourceItem {
+  id: string;
+  url: string;
+  title: string | null;
+  ingested: boolean;
+}
+
+function ProjectSources({ projectId }: { projectId?: string }) {
+  const [open, setOpen] = useState(false);
+  const [sources, setSources] = useState<ProjectSourceItem[]>([]);
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!projectId) return;
+    apiFetch(`/api/projects/${projectId}/sources`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data?.sources && setSources(data.sources))
+      .catch(() => {});
+  }, [projectId]);
+
+  const addSource = async () => {
+    const trimmed = url.trim();
+    if (!trimmed || !projectId || busy) return;
+    setBusy(true);
+    try {
+      const res = await apiFetch(`/api/projects/${projectId}/sources`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: trimmed }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSources((prev) => [...prev, data.source]);
+        setUrl("");
+        toast.success(data.source.ingested ? "Fonte adicionada (texto completo)" : "Fonte adicionada");
+      } else {
+        toast.error(data.error || "Erro ao adicionar fonte");
+      }
+    } catch {
+      toast.error("Falha ao adicionar fonte");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeSource = async (sourceId: string) => {
+    if (!projectId) return;
+    try {
+      const res = await apiFetch(`/api/projects/${projectId}/sources/${sourceId}`, { method: "DELETE" });
+      if (res.ok) setSources((prev) => prev.filter((s) => s.id !== sourceId));
+    } catch {
+      toast.error("Falha ao remover fonte");
+    }
+  };
+
+  return (
+    <div className="mb-3 border border-border rounded-lg">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-xs font-medium"
+      >
+        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <BookOpen className="h-3.5 w-3.5" />
+        Fontes do projeto ({sources.length})
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-2">
+          <p className="text-[11px] text-muted-foreground">
+            O orientador prioriza estas fontes ao verificar suas afirmações.
+          </p>
+          {sources.map((s) => (
+            <div key={s.id} className="flex items-center gap-1.5 text-xs">
+              <a
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-primary hover:underline truncate"
+              >
+                {s.title || s.url}
+              </a>
+              {s.ingested && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary whitespace-nowrap">
+                  texto completo
+                </span>
+              )}
+              <button
+                type="button"
+                aria-label="Remover fonte"
+                onClick={() => removeSource(s.id)}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          <div className="flex gap-1.5">
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addSource()}
+              placeholder="URL do paper (PDF ou página)"
+              disabled={busy}
+              className="flex-1 px-2 py-1.5 text-xs rounded border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/50 disabled:opacity-50"
+            />
+            <Button size="sm" variant="outline" className="h-7 px-2" onClick={addSource} disabled={busy || !url.trim()}>
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChatInterface({
   projectId,
   content,
@@ -975,6 +1093,37 @@ function ChatInterface({
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    apiFetch(`/api/projects/${projectId}/research/history`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data?.messages) && data.messages.length) {
+          setMessages(data.messages);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  const handleVerdictFeedback = async (v: ChatVerdict, agreed: boolean) => {
+    if (!projectId || feedbackSent.has(v.claim)) return;
+    setFeedbackSent((prev) => new Set(prev).add(v.claim));
+    try {
+      await apiFetch(`/api/projects/${projectId}/research/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claim: v.claim, classification: v.classification, agreed }),
+      });
+    } catch {
+      toast.error("Falha ao registrar feedback");
+    }
+  };
 
   const handleSuggestSources = async (claim: string) => {
     if (!projectId || loading) return;
@@ -1032,6 +1181,7 @@ function ChatInterface({
 
   return (
     <div className="flex flex-col h-full">
+      <ProjectSources projectId={projectId} />
       <div className="flex-1 space-y-3 mb-4">
         {messages.length === 0 ? (
           <div className="text-center py-8">
@@ -1080,8 +1230,33 @@ function ChatInterface({
                         <div className="flex items-start gap-1.5">
                           <span className={cn("text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap", VERDICT_STYLE[v.classification].cls)}>
                             {VERDICT_STYLE[v.classification].label}
+                            {typeof v.confidence === "number" && ` ${Math.round(v.confidence * 100)}%`}
                           </span>
                           <span className="flex-1">{v.claim}</span>
+                          {feedbackSent.has(v.claim) ? (
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">obrigado</span>
+                          ) : (
+                            <span className="flex gap-1 whitespace-nowrap">
+                              <button
+                                type="button"
+                                title="Verdict correto"
+                                aria-label="Verdict correto"
+                                onClick={() => handleVerdictFeedback(v, true)}
+                                className="text-[11px] hover:opacity-70"
+                              >
+                                👍
+                              </button>
+                              <button
+                                type="button"
+                                title="Verdict incorreto"
+                                aria-label="Verdict incorreto"
+                                onClick={() => handleVerdictFeedback(v, false)}
+                                className="text-[11px] hover:opacity-70"
+                              >
+                                👎
+                              </button>
+                            </span>
+                          )}
                         </div>
                         {v.evidence && (
                           <p className="mt-1 ml-1 border-l-2 border-border pl-2 text-muted-foreground italic">

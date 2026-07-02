@@ -1,0 +1,34 @@
+name: AI Evals
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+    env:
+      AI_GATEWAY_URL: ${{ secrets.AI_GATEWAY_URL }}
+      AI_GATEWAY_KEY: ${{ secrets.AI_GATEWAY_KEY }}
+      AI_GATEWAY_MODEL: ${{ secrets.AI_GATEWAY_MODEL }}
+      AI_GATEWAY_VERIFY_MODEL: ${{ secrets.AI_GATEWAY_VERIFY_MODEL }}
+      DATABASE_URL: postgresql://eval:eval@localhost:5432/eval?schema=public
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install
+      - run: bunx prisma generate
+      - name: Citation benchmark (Crossref/S2/DBLP)
+        run: bun run eval:citations
+      - name: Verdict benchmark (LLM)
+        if: env.AI_GATEWAY_KEY != ''
+        run: bun run eval:verdicts

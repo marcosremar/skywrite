@@ -15,6 +15,7 @@ import { reportRouter } from "./routes/report.js";
 import { templatesRouter } from "./routes/templates.js";
 import { writingRouter } from "./routes/writing.js";
 import { grammarRouter } from "./routes/grammar.js";
+import { sourcesRouter } from "./routes/sources.js";
 import { originalityRouter } from "./routes/originality.js";
 import { pingGateway } from "./lib/ai-gateway.js";
 import { db } from "./db.js";
@@ -58,6 +59,7 @@ export function createApp() {
   app.use("/api/projects/:id/report", reportRouter);
   app.use("/api/projects/:id/writing", writingRouter);
   app.use("/api/projects/:id/grammar", grammarRouter);
+  app.use("/api/projects/:id/sources", sourcesRouter);
   app.use("/api/projects/:id/originality", originalityRouter);
   app.use("/api/projects", projectsRouter);
 

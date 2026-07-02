@@ -2,7 +2,8 @@ import { Router } from "express";
 import { db } from "../db.js";
 import { requireAuth } from "../auth.js";
 import { chat, searchWeb, VERIFY_MODEL, type SearchSource } from "../lib/ai-gateway.js";
-import { ingestSources, relevantExcerpts, type IngestedPaper } from "../lib/paper-ingest.js";
+import { ingestSources, type IngestedPaper } from "../lib/paper-ingest.js";
+import { rankedExcerpts } from "../lib/semantic-excerpts.js";
 import { heavyLimiter } from "../lib/rate-limit.js";
 
 export const researchRouter = Router({ mergeParams: true });
@@ -22,6 +23,7 @@ Responda APENAS com um objeto JSON válido, sem texto fora dele, no formato:
     {
       "claim": "afirmação do aluno avaliada",
       "classification": "supported | partial | unsupported | uncertain",
+      "confidence": número entre 0 e 1 com sua confiança na classificação,
       "evidence": "trecho exato da fonte que sustenta ou refuta (vazio se não houver)",
       "source": número da fonte [n] que sustenta, ou null
     }
@@ -45,6 +47,7 @@ export type VerdictClass = "supported" | "partial" | "unsupported" | "uncertain"
 export interface Verdict {
   claim: string;
   classification: VerdictClass;
+  confidence: number;
   evidence: string;
   source: number | null;
 }
@@ -87,11 +90,13 @@ export function parseResearchResponse(raw: string, maxSource = 0): { answer: str
               const src = v.source;
               const validSource =
                 typeof src === "number" && src >= 1 && (maxSource === 0 || src <= maxSource) ? src : null;
+              const conf = typeof v.confidence === "number" ? v.confidence : 0.5;
               return {
                 claim: String(v.claim),
                 classification: VALID_CLASSES.includes(v.classification as VerdictClass)
                   ? (v.classification as VerdictClass)
                   : "uncertain",
+                confidence: Math.min(1, Math.max(0, conf)),
                 evidence: typeof v.evidence === "string" ? v.evidence : "",
                 source: validSource,
               };
@@ -134,15 +139,15 @@ function buildUserMessage(
   fileName: string,
   content: string,
   sources: SearchSource[],
-  papers: IngestedPaper[]
+  excerpts: Map<string, string>,
+  otherChapters: string
 ) {
-  const byUrl = new Map(papers.map((p) => [p.url, p]));
   const sourcesText = sources.length
     ? sources
         .map((s, i) => {
-          const paper = byUrl.get(s.url);
-          const body = paper
-            ? `TEXTO COMPLETO (trechos relevantes):\n<fonte>\n${stripFonteTag(relevantExcerpts(paper.content, question + " " + content))}\n</fonte>`
+          const excerpt = excerpts.get(s.url);
+          const body = excerpt
+            ? `TEXTO COMPLETO (trechos relevantes):\n<fonte>\n${stripFonteTag(excerpt)}\n</fonte>`
             : `Resumo: <fonte>${stripFonteTag(s.snippet)}</fonte>`;
           return `[${i + 1}] ${s.title}\n${s.url}\n${body}`;
         })
@@ -153,12 +158,50 @@ function buildUserMessage(
     ? `Seção atual (${fileName || "documento"}):\n"""\n${content.slice(0, 4000)}\n"""`
     : "";
 
+  const context = otherChapters
+    ? `Outros capítulos do projeto (início de cada um, para contexto):\n"""\n${otherChapters}\n"""`
+    : "";
+
   return `Pergunta do aluno: ${question}
 
 ${section}
 
+${context}
+
 Fontes:
 ${sourcesText}`;
+}
+
+const MAX_CONTEXT_CHARS = 8000;
+const CHAPTER_SLICE = 1200;
+
+async function otherChaptersContext(projectId: string, currentFileName: string): Promise<string> {
+  const files = await db.projectFile.findMany({
+    where: { projectId, type: "MARKDOWN" },
+    orderBy: { path: "asc" },
+    select: { path: true, name: true, content: true },
+  });
+  let out = "";
+  for (const f of files) {
+    if (f.name === currentFileName || !(f.content ?? "").trim()) continue;
+    if (out.length >= MAX_CONTEXT_CHARS) break;
+    out += `### ${f.path}\n${(f.content ?? "").slice(0, CHAPTER_SLICE)}\n\n`;
+  }
+  return out.trim();
+}
+
+const HISTORY_TURNS = 8;
+
+async function conversationHistory(projectId: string) {
+  const rows = await db.chatMessage.findMany({
+    where: { projectId },
+    orderBy: { createdAt: "desc" },
+    take: HISTORY_TURNS,
+  });
+  return rows.reverse().map((m) => ({
+    role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+    content: m.content.slice(0, 2000),
+  }));
 }
 
 researchRouter.post("/", heavyLimiter, async (req, res) => {
@@ -175,43 +218,135 @@ researchRouter.post("/", heavyLimiter, async (req, res) => {
       return res.status(404).json({ error: "Project not found" });
     }
 
-    const searchQuery = await focusedQuery(question, content || "");
+    const [searchQuery, history, otherChapters, projectSources] = await Promise.all([
+      focusedQuery(question, content || ""),
+      conversationHistory(id),
+      otherChaptersContext(id, fileName || ""),
+      db.projectSource.findMany({ where: { projectId: id }, orderBy: { createdAt: "asc" } }),
+    ]);
 
-    let sources: SearchSource[] = [];
+    let webSources: SearchSource[] = [];
     try {
-      sources = (await searchWeb(searchQuery)).filter((s) => s.url && s.title);
+      webSources = (await searchWeb(searchQuery)).filter((s) => s.url && s.title);
     } catch (err) {
       console.error("Search failed:", err);
     }
 
+    const librarySources: SearchSource[] = projectSources.map((s) => ({
+      title: s.title || s.url,
+      url: s.url,
+      snippet: "",
+    }));
+    const libraryUrls = new Set(librarySources.map((s) => s.url));
+    const sources = [...librarySources, ...webSources.filter((s) => !libraryUrls.has(s.url))];
+
     let papers: IngestedPaper[] = [];
     try {
-      papers = await ingestSources(sources, INGEST_LIMIT);
+      papers = await ingestSources(sources, INGEST_LIMIT + Math.min(librarySources.length, 2));
     } catch (err) {
       console.error("Ingest failed:", err);
     }
     const ingestedUrls = new Set(papers.map((p) => p.url));
 
+    const excerpts = await rankedExcerpts(papers, question);
+
     const raw = await chat(
       [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: buildUserMessage(question, fileName || "", content || "", sources, papers) },
+        ...history,
+        {
+          role: "user",
+          content: buildUserMessage(question, fileName || "", content || "", sources, excerpts, otherChapters),
+        },
       ],
       VERIFY_MODEL
     );
     const { answer, verdicts } = parseResearchResponse(raw, sources.length);
 
+    const responseSources = sources.map((s) => ({ ...s, fullText: ingestedUrls.has(s.url) }));
+
+    try {
+      const now = Date.now();
+      await db.chatMessage.create({
+        data: { projectId: id, role: "user", content: question, createdAt: new Date(now) },
+      });
+      await db.chatMessage.create({
+        data: {
+          projectId: id,
+          role: "assistant",
+          content: answer,
+          verdicts: JSON.parse(JSON.stringify(verdicts)),
+          sources: JSON.parse(JSON.stringify(responseSources)),
+          createdAt: new Date(now + 1),
+        },
+      });
+    } catch (err) {
+      console.error("Chat persist failed:", err);
+    }
+
     return res.json({
       answer,
       verdicts,
       searchQuery,
-      sources: sources.map((s) => ({ ...s, fullText: ingestedUrls.has(s.url) })),
+      sources: responseSources,
     });
   } catch (error) {
     console.error("Research error:", error);
     return res.status(502).json({
       error: "Não foi possível consultar o orientador. Verifique se o ai-gateway está rodando.",
     });
+  }
+});
+
+researchRouter.get("/history", async (req, res) => {
+  try {
+    const { id } = req.params as { id: string };
+    const project = await db.project.findFirst({ where: { id, userId: req.userId } });
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    const rows = await db.chatMessage.findMany({
+      where: { projectId: id },
+      orderBy: { createdAt: "asc" },
+      take: 100,
+    });
+    return res.json({
+      messages: rows.map((m) => ({
+        role: m.role,
+        content: m.content,
+        verdicts: m.verdicts ?? undefined,
+        sources: m.sources ?? undefined,
+      })),
+    });
+  } catch (error) {
+    console.error("History error:", error);
+    return res.status(500).json({ error: "Erro ao carregar histórico" });
+  }
+});
+
+researchRouter.post("/feedback", async (req, res) => {
+  try {
+    const { id } = req.params as { id: string };
+    const { claim, classification, agreed } = req.body ?? {};
+    if (typeof claim !== "string" || !claim.trim() || typeof agreed !== "boolean") {
+      return res.status(400).json({ error: "claim e agreed são obrigatórios" });
+    }
+    const project = await db.project.findFirst({ where: { id, userId: req.userId } });
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    await db.verdictFeedback.create({
+      data: {
+        projectId: id,
+        claim: claim.slice(0, 2000),
+        classification: typeof classification === "string" ? classification.slice(0, 40) : "",
+        agreed,
+      },
+    });
+    return res.status(201).json({ ok: true });
+  } catch (error) {
+    console.error("Feedback error:", error);
+    return res.status(500).json({ error: "Erro ao registrar feedback" });
   }
 });
 

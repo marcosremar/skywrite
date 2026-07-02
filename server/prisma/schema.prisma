@@ -50,9 +50,12 @@ model Project {
   settings   Json    @default("{}")
 
   // Relations
-  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  files  ProjectFile[]
-  builds Build[]
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  files           ProjectFile[]
+  builds          Build[]
+  chatMessages    ChatMessage[]
+  sources         ProjectSource[]
+  verdictFeedback VerdictFeedback[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -160,6 +163,48 @@ model Template {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ============ ADVISOR ============
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  projectId String
+  role      String
+  content   String   @db.Text
+  verdicts  Json?
+  sources   Json?
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+}
+
+model ProjectSource {
+  id        String   @id @default(cuid())
+  projectId String
+  url       String
+  title     String?
+  ingested  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, url])
+}
+
+model VerdictFeedback {
+  id             String   @id @default(cuid())
+  projectId      String
+  claim          String
+  classification String
+  agreed         Boolean
+  createdAt      DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 // ============ PAPER CACHE ============

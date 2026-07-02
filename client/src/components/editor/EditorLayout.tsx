@@ -26,8 +26,16 @@ import {
   Minimize2,
   ArrowLeft,
   SpellCheck,
+  PenLine,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -137,6 +145,52 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
   const { focusMode } = preferences;
   const showAdvisorPanel = preferences.showAdvisorPanel && !isMobile;
   const showSidebar = preferences.showSidebar && !isMobile;
+
+  const [paraphrase, setParaphrase] = useState<{
+    from: number;
+    to: number;
+    original: string;
+    result: string;
+  } | null>(null);
+  const [paraphrasing, setParaphrasing] = useState(false);
+
+  const handleParaphrase = useCallback(async () => {
+    const sel = editorRef.current?.getSelectionRange();
+    if (!sel || !sel.text.trim()) {
+      toast.info("Selecione um trecho no editor para reescrever");
+      return;
+    }
+    setParaphrasing(true);
+    try {
+      const res = await apiFetch(`/api/projects/${project.id}/writing/paraphrase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: sel.text }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setParaphrase({ from: sel.from, to: sel.to, original: sel.text, result: data.text });
+      } else {
+        toast.error(data.error || "Assistente indisponível");
+      }
+    } catch {
+      toast.error("Falha ao reescrever o trecho");
+    } finally {
+      setParaphrasing(false);
+    }
+  }, [project.id]);
+
+  const applyParaphrase = () => {
+    if (!paraphrase) return;
+    const ok = editorRef.current?.replaceRange(
+      paraphrase.from,
+      paraphrase.to,
+      paraphrase.original,
+      paraphrase.result
+    );
+    if (!ok) toast.error("O texto mudou desde a seleção. Selecione novamente.");
+    setParaphrase(null);
+  };
 
   // Handlers
   const handleUndo = useCallback(() => editorRef.current?.undo(), []);
@@ -544,6 +598,18 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                     onRedo={handleRedo}
                   />
 
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    title="Reescrever seleção com IA"
+                    aria-label="Reescrever seleção com IA"
+                    onClick={handleParaphrase}
+                    disabled={paraphrasing}
+                  >
+                    {paraphrasing ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+                  </Button>
+
                   <div className="h-5 w-px bg-border mx-1" />
 
                   <BibliographyEditor
@@ -798,6 +864,9 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
                     projectId={project.id}
                     content={currentFileContent}
                     onGrammarMatches={(m) => editorRef.current?.setGrammarMatches(m)}
+                    onApplyFix={(f) =>
+                      editorRef.current?.replaceRange(f.offset, f.offset + f.length, f.text, f.replacement) ?? false
+                    }
                   />
                 </TabsContent>
               </Tabs>
@@ -805,6 +874,36 @@ export function EditorLayout({ project, files: initialFiles }: EditorLayoutProps
           </>
         )}
       </ResizablePanelGroup>
+
+      <Dialog open={!!paraphrase} onOpenChange={(open) => !open && setParaphrase(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reescrever com IA</DialogTitle>
+          </DialogHeader>
+          {paraphrase && (
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Original</p>
+                <p className="rounded border border-border bg-muted/40 p-2 whitespace-pre-wrap max-h-40 overflow-auto">
+                  {paraphrase.original}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Sugestão</p>
+                <p className="rounded border border-primary/40 bg-primary/5 p-2 whitespace-pre-wrap max-h-40 overflow-auto">
+                  {paraphrase.result}
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setParaphrase(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={applyParaphrase}>Aplicar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

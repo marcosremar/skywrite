@@ -139,6 +139,8 @@ export interface MarkdownEditorRef {
   insertAtCursor: (text: string) => void;
   setGrammarMatches: (matches: { offset: number; length: number }[]) => void;
   clearGrammar: () => void;
+  getSelectionRange: () => { from: number; to: number; text: string };
+  replaceRange: (from: number, to: number, expected: string, replacement: string) => boolean;
 }
 
 // Parse BibTeX content to extract citation entries
@@ -915,7 +917,7 @@ const grammarMark = Decoration.mark({ class: "cm-grammar-issue" });
 const grammarField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(deco, tr) {
-    if (tr.docChanged) return Decoration.none;
+    if (tr.docChanged) deco = deco.map(tr.changes);
     for (const effect of tr.effects) {
       if (effect.is(setGrammarEffect)) {
         const len = tr.state.doc.length;
@@ -1226,6 +1228,23 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     },
     clearGrammar: () => {
       editorRef.current?.view?.dispatch({ effects: setGrammarEffect.of([]) });
+    },
+    getSelectionRange: () => {
+      const view = editorRef.current?.view;
+      if (!view) return { from: 0, to: 0, text: "" };
+      const { from, to } = view.state.selection.main;
+      return { from, to, text: view.state.sliceDoc(from, to) };
+    },
+    replaceRange: (from, to, expected, replacement) => {
+      const view = editorRef.current?.view;
+      if (!view) return false;
+      if (to > view.state.doc.length || view.state.sliceDoc(from, to) !== expected) return false;
+      view.dispatch({
+        changes: { from, to, insert: replacement },
+        selection: { anchor: from + replacement.length },
+      });
+      view.focus();
+      return true;
     },
   }), []);
 

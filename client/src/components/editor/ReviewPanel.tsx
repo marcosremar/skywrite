@@ -11,6 +11,7 @@ interface ReviewPanelProps {
   projectId: string;
   content: string;
   onGrammarMatches?: (matches: { offset: number; length: number }[]) => void;
+  onApplyFix?: (fix: { offset: number; length: number; text: string; replacement: string }) => boolean;
 }
 
 interface GrammarMatch {
@@ -19,6 +20,7 @@ interface GrammarMatch {
   category: string;
   offset: number;
   length: number;
+  text?: string;
 }
 
 interface SubmissionCheck {
@@ -73,7 +75,7 @@ function Section({ icon, title, children }: { icon: ReactNode; title: string; ch
   );
 }
 
-export function ReviewPanel({ projectId, content, onGrammarMatches }: ReviewPanelProps) {
+export function ReviewPanel({ projectId, content, onGrammarMatches, onApplyFix }: ReviewPanelProps) {
   const [loading, setLoading] = useState(false);
   const [ran, setRan] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +107,8 @@ export function ReviewPanel({ projectId, content, onGrammarMatches }: ReviewPane
         apiFetch(`/api/projects/${projectId}/citations/submission`, { method: "POST" }),
         apiFetch(`/api/projects/${projectId}/originality`, { method: "POST" }),
       ]);
-      const matches: GrammarMatch[] = g.ok ? (await g.json()).matches ?? [] : [];
+      const rawMatches: GrammarMatch[] = g.ok ? (await g.json()).matches ?? [] : [];
+      const matches = rawMatches.map((m) => ({ ...m, text: content.slice(m.offset, m.offset + m.length) }));
       if (runIdRef.current !== runId) return;
       setGrammar(matches);
       onGrammarMatches?.(matches.map((m) => ({ offset: m.offset, length: m.length })));
@@ -123,6 +126,22 @@ export function ReviewPanel({ projectId, content, onGrammarMatches }: ReviewPane
     } finally {
       if (runIdRef.current === runId) setLoading(false);
     }
+  };
+
+  const applyFix = (index: number, replacement: string) => {
+    if (!grammar || !onApplyFix) return;
+    const m = grammar[index];
+    const ok = onApplyFix({ offset: m.offset, length: m.length, text: m.text ?? "", replacement });
+    if (!ok) {
+      toast.error("O texto mudou desde a análise. Clique em Analisar novamente.");
+      return;
+    }
+    const delta = replacement.length - m.length;
+    const updated = grammar
+      .filter((_, i) => i !== index)
+      .map((g) => (g.offset > m.offset ? { ...g, offset: g.offset + delta } : g));
+    setGrammar(updated);
+    onGrammarMatches?.(updated.map((g) => ({ offset: g.offset, length: g.length })));
   };
 
   const callWriting = async (kind: "titles" | "abstract") => {
@@ -171,10 +190,24 @@ export function ReviewPanel({ projectId, content, onGrammarMatches }: ReviewPane
               ) : (
                 <ul className="space-y-2">
                   {grammar.slice(0, 50).map((m, i) => (
-                    <li key={i} className="text-sm">
+                    <li key={`${m.offset}-${i}`} className="text-sm">
                       <span className="text-muted-foreground">[{m.category}]</span> {m.message}
+                      {m.text && <span className="text-muted-foreground"> — “{m.text.slice(0, 60)}”</span>}
                       {m.replacements.length > 0 && (
-                        <span className="text-primary"> → {m.replacements.slice(0, 3).join(", ")}</span>
+                        <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+                          {m.replacements.slice(0, 3).map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => applyFix(i, r)}
+                              disabled={!onApplyFix}
+                              title="Aplicar correção"
+                              className="text-xs px-1.5 py-0.5 rounded border border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50"
+                            >
+                              {r}
+                            </button>
+                          ))}
+                        </span>
                       )}
                     </li>
                   ))}

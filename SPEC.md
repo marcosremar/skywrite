@@ -93,8 +93,13 @@ Base: `/api`. Respostas JSON. Rotas marcadas com 🔒 exigem cookie de auth.
 | GET | `/api/projects/:id/build` 🔒 | Últimos builds (sem o PDF). |
 | POST | `/api/projects/:id/build` 🔒 | Gera PDF (pandoc→tectonic); rate-limit + 409 se já há build em andamento; retorna `pdfPath`. |
 | GET | `/api/projects/:id/build/:buildId/pdf` 🔒 | Serve o PDF (inline; `?download=1` para baixar). |
-| POST | `/api/projects/:id/research` 🔒 | Orientador Virtual (RAG). Retorna `{ answer, verdicts[], sources }`; verdicts em 4 classes (supported/partial/unsupported/uncertain) + trecho. Ver §7. |
+| POST | `/api/projects/:id/research` 🔒 | Orientador Virtual (RAG). Retorna `{ answer, verdicts[], sources }`; verdicts em 4 classes (supported/partial/unsupported/uncertain) + `confidence` (0–1) + trecho. Usa o histórico da conversa e o início dos demais capítulos como contexto; persiste cada turno. Ver §7. |
+| GET | `/api/projects/:id/research/history` 🔒 | Histórico do chat do Orientador (últimas 100 mensagens, com verdicts/fontes). |
+| POST | `/api/projects/:id/research/feedback` 🔒 | Registra concordância do usuário com um verdict (`{ claim, classification, agreed }`). |
 | POST | `/api/projects/:id/research/sources` 🔒 | Sugere fontes acadêmicas para uma afirmação (`{ claim }`). |
+| GET | `/api/projects/:id/sources` 🔒 | Lista fontes do projeto (biblioteca do usuário). |
+| POST | `/api/projects/:id/sources` 🔒 | Adiciona fonte por URL (`{ url }`); tenta ingestão de texto completo; máx. 20 por projeto. |
+| DELETE | `/api/projects/:id/sources/:sourceId` 🔒 | Remove fonte do projeto. |
 | POST | `/api/projects/:id/citations/check` 🔒 | Verifica existência das referências do `.bib` no Crossref (found/mismatch/not-found). |
 | POST | `/api/projects/:id/citations/integrity` 🔒 | Cross-check in-text↔`.bib` (`orphans`/`unused`) + completude ABNT (`incomplete`). |
 | POST | `/api/projects/:id/citations/doi` 🔒 | DOI → entrada BibTeX completa via Crossref (`{ doi }` → `{ bibtex }`). |
@@ -126,12 +131,13 @@ Painel direito do editor com **abas**: **Visualizar** (preview do PDF) e **Orien
 Endpoint `POST /api/projects/:id/research` com `{ question, content, fileName }`. Fluxo:
 
 1. **Query focada** — um LLM curto transforma a pergunta + seção numa query de busca acadêmica só com termos-chave (no idioma do texto). Retornada em `searchQuery`.
-2. **Busca** — `ai-gateway /v1/search` (SearXNG, `categories=science`) → fontes `{ title, url, snippet }`.
-3. **Ingestão automática** (top 3 fontes) — `paper-ingest.ts`:
+2. **Busca** — `ai-gateway /v1/search` (SearXNG, `categories=science`) → fontes `{ title, url, snippet }`. As **fontes do projeto** (biblioteca do usuário, `ProjectSource`) entram na frente dos resultados da web.
+3. **Ingestão automática** (fontes do projeto + top da web) — `paper-ingest.ts`:
    - resolve URL (arxiv `abs` → `pdf`), baixa com limites (≤ 20 MB, timeout 40 s);
    - PDF → texto via **`unpdf`**; HTML → texto via strip de tags;
    - guarda **só o markdown/texto** no cache `Paper` (dedup por URL).
-4. **Grounding/verificação** — `relevantExcerpts` recorta janelas em torno das palavras-chave; o LLM (`/v1/chat/completions`) recebe os **trechos do texto completo** e é instruído a confirmar se a afirmação está suportada, citar o trecho exato e dizer "não encontrei suporte" quando não estiver.
+4. **Seleção de trechos** — `semantic-excerpts.ts` divide os papers em chunks e pede a um LLM os mais relevantes para a pergunta (considera sinônimos); fallback para `relevantExcerpts` (janelas por palavra-chave) se o rerank falhar.
+5. **Grounding/verificação** — o LLM (`/v1/chat/completions`) recebe os **trechos do texto completo**, o **histórico da conversa** (últimos 8 turnos, persistidos em `ChatMessage`) e o **início dos demais capítulos** do projeto; é instruído a confirmar se a afirmação está suportada, citar o trecho exato, informar `confidence` (0–1) por verdict e dizer "não encontrei suporte" quando não estiver. O usuário pode marcar verdicts como corretos/incorretos (`VerdictFeedback`).
 
 Resposta: `{ answer, searchQuery, sources: [{ title, url, snippet, fullText }] }`. Fontes com `fullText: true` (texto completo analisado) ganham o badge "texto completo" na UI.
 
